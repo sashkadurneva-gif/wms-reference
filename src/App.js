@@ -51,6 +51,7 @@ function App() {
   const [searchMessage, setSearchMessage] = useState("");
   const [newFeatureText, setNewFeatureText] = useState("");
   const [addMessage, setAddMessage] = useState("");
+  const [isDiagramView, setIsDiagramView] = useState(false);
 
   const selectedArticle = useMemo(
     () => articles.find((article) => article.id === selectedArticleId) ?? articles[0],
@@ -69,6 +70,13 @@ function App() {
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isKnowledgeBaseOpen]);
+
+  useEffect(() => {
+    const hasSelectedArticle = articles.some((article) => article.id === selectedArticleId);
+    if (!hasSelectedArticle && articles.length > 0) {
+      setSelectedArticleId(articles[0].id);
+    }
+  }, [articles, selectedArticleId]);
 
   const openKnowledgeBase = () => {
     setSearchMessage("");
@@ -96,18 +104,12 @@ function App() {
     );
 
   const processTree = useMemo(() => {
-    const customArticles = articles.filter((article) => article.section === "Новый функционал");
     return [
       { group: "Приемка", status: "Реализовано", children: ["Проверка поставки по накладной"] },
       { group: "Хранение", status: "Реализовано", children: ["Адресное размещение товара"] },
-      { group: "Отгрузка", status: "Реализовано", children: ["Чек-лист перед отгрузкой"] },
-      {
-        group: "Новый функционал",
-        status: customArticles.length ? "В разработке" : "Пусто",
-        children: customArticles.map((article) => article.title)
-      }
+      { group: "Отгрузка", status: "Реализовано", children: ["Чек-лист перед отгрузкой"] }
     ];
-  }, [articles]);
+  }, []);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -169,6 +171,61 @@ function App() {
     setNewFeatureText("");
   };
 
+  const handleDeleteFeature = (articleId) => {
+    const articleToDelete = articles.find((article) => article.id === articleId);
+    if (!articleToDelete || articleToDelete.section !== "Новый функционал") {
+      return;
+    }
+
+    setArticles((prev) => prev.filter((article) => article.id !== articleId));
+    setSearchMessage(`Функциональность удалена: ${articleToDelete.title}`);
+  };
+
+  const handleEditFeature = (articleId) => {
+    const articleToEdit = articles.find((article) => article.id === articleId);
+    if (!articleToEdit || articleToEdit.section !== "Новый функционал") {
+      return;
+    }
+
+    const currentDescription = articleToEdit.content.replace(
+      "Пользовательское описание: ",
+      ""
+    );
+    const cleanDescription = currentDescription.replace(
+      ". Система добавила этот функционал в структуру базы знаний понятным языком.",
+      ""
+    );
+
+    const updatedDescription = window.prompt(
+      "Обновите описание функциональности:",
+      cleanDescription
+    );
+
+    if (!updatedDescription || !updatedDescription.trim()) {
+      return;
+    }
+
+    const normalized = updatedDescription.trim();
+    setArticles((prev) =>
+      prev.map((article) =>
+        article.id === articleId
+          ? {
+              ...article,
+              title: `Новая функция: ${normalized.slice(0, 42)}${
+                normalized.length > 42 ? "..." : ""
+              }`,
+              content: `Пользовательское описание: ${normalized}. Система добавила этот функционал в структуру базы знаний понятным языком.`,
+              keywords: normalized
+                .toLowerCase()
+                .split(/\s+/)
+                .filter((word) => word.length > 3)
+            }
+          : article
+      )
+    );
+    setSearchMessage("Функциональность обновлена.");
+  };
+
   return (
     <div className="page">
       <div className="content">
@@ -219,34 +276,43 @@ function App() {
         </div>
 
         <section className="process-tree">
-          <h2>Дерево процессов</h2>
-          <ul className="process-list">
-            {processTree.map((node) => (
-              <li key={node.group} className="process-node">
-                <div className="process-title-row">
-                  <strong>{node.group}</strong>
-                  <span
-                    className={`process-status ${
-                      node.status === "Реализовано"
-                        ? "process-status--done"
-                        : node.status === "В разработке"
-                          ? "process-status--progress"
-                          : "process-status--empty"
-                    }`}
-                  >
-                    {node.status}
-                  </span>
-                </div>
-                <ul>
-                  {node.children.length ? (
-                    node.children.map((child) => <li key={`${node.group}-${child}`}>{child}</li>)
-                  ) : (
-                    <li>Пока нет добавленных процессов</li>
-                  )}
-                </ul>
-              </li>
-            ))}
-          </ul>
+          <h2
+            className="process-tree-title"
+            onClick={() => setIsDiagramView((prev) => !prev)}
+            title="Нажмите, чтобы переключить формат"
+          >
+            Дерево процессов {isDiagramView ? "(диаграмма)" : "(список)"}
+          </h2>
+          {!isDiagramView ? (
+            <ul className="process-list">
+              {processTree.map((node) => (
+                <li key={node.group} className="process-node">
+                  <div className="process-title-row">
+                    <strong>{node.group}</strong>
+                    <span className="process-status process-status--done">{node.status}</span>
+                  </div>
+                  <ul>
+                    {node.children.map((child) => (
+                      <li key={`${node.group}-${child}`}>{child}</li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="process-diagram">
+              <div className="diagram-root">KONCRIT WMS</div>
+              <div className="diagram-branches">
+                {processTree.map((node) => (
+                  <div key={`diagram-${node.group}`} className="diagram-branch">
+                    <div className="diagram-node">{node.group}</div>
+                    <div className="diagram-arrow">↓</div>
+                    <div className="diagram-leaf">{node.children[0]}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       </div>
 
@@ -295,6 +361,46 @@ function App() {
                 >
                   <h3>{article.title}</h3>
                   <p>{article.content}</p>
+                  {article.section === "Новый функционал" && (
+                    <div className="feature-actions">
+                      <span
+                        className="feature-action-link"
+                        role="button"
+                        tabIndex={0}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleEditFeature(article.id);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            handleEditFeature(article.id);
+                          }
+                        }}
+                      >
+                        Редактировать
+                      </span>
+                      <span
+                        className="feature-action-link feature-action-link--danger"
+                        role="button"
+                        tabIndex={0}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDeleteFeature(article.id);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            handleDeleteFeature(article.id);
+                          }
+                        }}
+                      >
+                        Удалить
+                      </span>
+                    </div>
+                  )}
                 </button>
               ))}
             </div>

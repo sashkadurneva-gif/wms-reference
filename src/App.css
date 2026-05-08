@@ -179,6 +179,11 @@
   font-size: 22px;
 }
 
+.process-tree-title {
+  cursor: pointer;
+  user-select: none;
+}
+
 .process-list {
   margin: 0;
   padding-left: 18px;
@@ -210,14 +215,47 @@
   border-color: #32386d;
 }
 
-.process-status--progress {
-  color: #121239;
-  background: #f5f5f5;
+.process-diagram {
+  display: grid;
+  gap: 16px;
 }
 
-.process-status--empty {
-  color: #32386d;
+.diagram-root {
+  border: 1px solid #32386d;
+  border-radius: 10px;
+  background: #32386d;
+  color: #ffffff;
+  padding: 10px 12px;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.diagram-branches {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.diagram-branch {
+  border: 1px solid #bdbdbd;
+  border-radius: 12px;
   background: #ffffff;
+  padding: 12px;
+}
+
+.diagram-node {
+  font-weight: 700;
+  color: #32386d;
+}
+
+.diagram-arrow {
+  color: #32386d;
+  margin: 6px 0;
+}
+
+.diagram-leaf {
+  color: #121239;
+  font-size: 14px;
 }
 
 .knowledge-overlay {
@@ -326,6 +364,22 @@
 
 .knowledge-card p {
   margin: 0;
+  color: #121239;
+}
+
+.feature-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 14px;
+}
+
+.feature-action-link {
+  color: #32386d;
+  text-decoration: underline;
+  font-size: 13px;
+}
+
+.feature-action-link--danger {
   color: #121239;
 }
 
