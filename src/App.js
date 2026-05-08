@@ -21,7 +21,7 @@ function App() {
     <div className="page">
       <header className="hero">
         <p className="tag">Складская справочная система</p>
-        <h1>WMS Reference</h1>
+        <h1>KONCRIT</h1>
         <p className="subtitle">
           Быстрый доступ к основным процессам склада: от приемки до отгрузки.
         </p>
@@ -40,7 +40,7 @@ function App() {
       </div>
 
       <footer className="footer">
-        <span>Поддержка: support@wms-reference.ru</span>
+        <span>Поддержка: support@koncrit.ru</span>
         <span>Телефон: +7 (999) 123-45-67</span>
       </footer>
     </div>
