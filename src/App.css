@@ -100,14 +100,26 @@
 }
 
 .add-feature-form {
-  display: flex;
+  display: grid;
   gap: 8px;
-  align-items: flex-start;
   margin-top: 12px;
 }
 
+.feature-form-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.feature-form-label {
+  font-size: 14px;
+  color: #32386d;
+  font-weight: 600;
+}
+
 .feature-section-select {
-  min-width: 150px;
+  min-width: 220px;
   border: 1px solid #bdbdbd;
   border-radius: 10px;
   padding: 10px 12px;
@@ -267,6 +279,13 @@
   font-size: 14px;
 }
 
+.diagram-leaf-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
 .knowledge-overlay {
   position: fixed;
   inset: 0;
@@ -296,6 +315,13 @@
 .knowledge-header h2 {
   margin: 0;
   color: #32386d;
+}
+
+.knowledge-meta {
+  display: flex;
+  gap: 10px;
+  color: #32386d;
+  font-size: 13px;
 }
 
 .secondary-button {
@@ -363,6 +389,29 @@
   color: #121239;
   border-radius: 4px;
   padding: 0 2px;
+}
+
+.section-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.section-filter-btn {
+  border: 1px solid #bdbdbd;
+  background: #ffffff;
+  color: #32386d;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.section-filter-btn--active {
+  border-color: #32386d;
+  background: #32386d;
+  color: #ffffff;
 }
 
 .knowledge-grid {
@@ -463,13 +512,15 @@
     min-width: 100%;
   }
 
-  .add-feature-form {
-    flex-direction: column;
+  .add-feature-button,
+  .feature-section-select,
+  .feature-form-top {
+    width: 100%;
   }
 
-  .add-feature-button,
-  .feature-section-select {
-    width: 100%;
+  .feature-form-top {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .edit-content {

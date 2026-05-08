@@ -169,12 +169,17 @@ function App() {
   const [editArticleId, setEditArticleId] = useState("");
   const [editFeatureText, setEditFeatureText] = useState("");
   const [editFeatureSection, setEditFeatureSection] = useState(sections[0].title);
+  const [activeSectionFilter, setActiveSectionFilter] = useState("Все");
 
   const isCustomArticle = (article) => article.id.startsWith("custom-");
 
   const selectedArticle = useMemo(
     () => articles.find((article) => article.id === selectedArticleId) ?? articles[0],
     [articles, selectedArticleId]
+  );
+  const customArticlesCount = useMemo(
+    () => articles.filter((article) => isCustomArticle(article)).length,
+    [articles]
   );
 
   useEffect(() => {
@@ -287,6 +292,13 @@ function App() {
       };
     });
   }, [articles]);
+
+  const visibleArticles = useMemo(() => {
+    if (activeSectionFilter === "Все") {
+      return articles;
+    }
+    return articles.filter((article) => article.section === activeSectionFilter);
+  }, [activeSectionFilter, articles]);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -411,17 +423,23 @@ function App() {
             </form>
           </div>
           <form className="add-feature-form" onSubmit={handleAddFeature}>
-            <select
-              className="feature-section-select"
-              value={newFeatureSection}
-              onChange={(event) => setNewFeatureSection(event.target.value)}
-            >
-              {sections.map((item) => (
-                <option key={`add-${item.title}`} value={item.title}>
-                  {item.title}
-                </option>
-              ))}
-            </select>
+            <div className="feature-form-top">
+              <label htmlFor="new-feature-section" className="feature-form-label">
+                Раздел, куда добавить функциональность
+              </label>
+              <select
+                id="new-feature-section"
+                className="feature-section-select"
+                value={newFeatureSection}
+                onChange={(event) => setNewFeatureSection(event.target.value)}
+              >
+                {sections.map((item) => (
+                  <option key={`add-${item.title}`} value={item.title}>
+                    {item.title}
+                  </option>
+                ))}
+              </select>
+            </div>
             <textarea
               className="feature-input"
               value={newFeatureText}
@@ -478,9 +496,17 @@ function App() {
                   <div key={`diagram-${node.group}`} className="diagram-branch">
                     <div className="diagram-node">{node.group}</div>
                     <div className="diagram-arrow">↓</div>
-                    <div className="diagram-leaf">
-                      {node.children.length > 0 ? node.children[0] : "Подразделы пока не добавлены"}
-                    </div>
+                    {node.children.length > 0 ? (
+                      <ul className="diagram-leaf-list">
+                        {node.children.map((child) => (
+                          <li key={`diagram-child-${node.group}-${child}`} className="diagram-leaf">
+                            {child}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="diagram-leaf">Подразделы пока не добавлены</div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -503,6 +529,10 @@ function App() {
           <div className="knowledge-content">
             <div className="knowledge-header">
               <h2>База знаний KONCRIT</h2>
+              <div className="knowledge-meta">
+                <span>Всего статей: {articles.length}</span>
+                <span>Пользовательских: {customArticlesCount}</span>
+              </div>
               <button
                 className="secondary-button"
                 type="button"
@@ -510,6 +540,30 @@ function App() {
               >
                 Закрыть
               </button>
+            </div>
+
+            <div className="section-filters">
+              <button
+                type="button"
+                className={`section-filter-btn ${
+                  activeSectionFilter === "Все" ? "section-filter-btn--active" : ""
+                }`}
+                onClick={() => setActiveSectionFilter("Все")}
+              >
+                Все
+              </button>
+              {sections.map((sectionItem) => (
+                <button
+                  key={`filter-${sectionItem.title}`}
+                  type="button"
+                  className={`section-filter-btn ${
+                    activeSectionFilter === sectionItem.title ? "section-filter-btn--active" : ""
+                  }`}
+                  onClick={() => setActiveSectionFilter(sectionItem.title)}
+                >
+                  {sectionItem.title}
+                </button>
+              ))}
             </div>
 
             <article className="article-view">
@@ -520,7 +574,7 @@ function App() {
             </article>
 
             <div className="knowledge-grid">
-              {articles.map((article) => (
+              {visibleArticles.map((article) => (
                 <button
                   key={article.id}
                   className={`knowledge-card ${
