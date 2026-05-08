@@ -324,6 +324,12 @@
   font-size: 13px;
 }
 
+.drag-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #32386d;
+}
+
 .secondary-button {
   border: 1px solid #bdbdbd;
   border-radius: 10px;
@@ -427,6 +433,14 @@
   background: #ffffff;
   text-align: left;
   cursor: pointer;
+}
+
+.knowledge-card[draggable="true"] {
+  cursor: grab;
+}
+
+.knowledge-card[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .knowledge-card h3 {

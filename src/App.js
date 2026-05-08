@@ -40,6 +40,54 @@ const initialArticles = [
     content:
       "Проверьте комплектацию заказа, качество упаковки, маркировку и подтверждение транспортной службы перед передачей груза.",
     keywords: ["чек-лист", "отгрузка", "упаковка", "маркировка"]
+  },
+  {
+    id: "receiving-quality-control",
+    section: "Приемка",
+    title: "Контроль качества при приемке",
+    content:
+      "Проведите визуальный осмотр упаковки, проверьте сроки годности и отметьте дефекты в карточке поставки до размещения товара.",
+    keywords: ["качество", "приемка", "дефекты", "сроки"]
+  },
+  {
+    id: "receiving-discrepancy-act",
+    section: "Приемка",
+    title: "Оформление акта расхождений",
+    content:
+      "Зафиксируйте излишки или недостачу, сформируйте акт расхождений и отправьте уведомление ответственному менеджеру.",
+    keywords: ["акт", "расхождения", "недостача", "излишки"]
+  },
+  {
+    id: "storage-inventory-cycle",
+    section: "Хранение",
+    title: "Циклическая инвентаризация",
+    content:
+      "Планируйте пересчет по зонам, сравнивайте фактические остатки с учетными и создавайте корректировки по итогам проверки.",
+    keywords: ["инвентаризация", "остатки", "корректировки", "зоны"]
+  },
+  {
+    id: "storage-expiration-control",
+    section: "Хранение",
+    title: "Контроль сроков годности",
+    content:
+      "Отслеживайте партии с коротким сроком, формируйте задания на приоритетный отбор и предотвращайте списания.",
+    keywords: ["сроки", "партии", "списания", "контроль"]
+  },
+  {
+    id: "shipment-route-priorities",
+    section: "Отгрузка",
+    title: "Приоритеты маршрутов отгрузки",
+    content:
+      "Сортируйте отгрузки по SLA и типу клиента, чтобы сначала отправлять критичные и срочные заказы.",
+    keywords: ["маршрут", "приоритет", "sla", "клиент"]
+  },
+  {
+    id: "shipment-pack-control",
+    section: "Отгрузка",
+    title: "Финальная проверка упаковки",
+    content:
+      "Перед закрытием заказа выполните контроль веса, соответствия маркировки и целостности упаковки.",
+    keywords: ["упаковка", "вес", "маркировка", "проверка"]
   }
 ];
 
@@ -170,6 +218,7 @@ function App() {
   const [editFeatureText, setEditFeatureText] = useState("");
   const [editFeatureSection, setEditFeatureSection] = useState(sections[0].title);
   const [activeSectionFilter, setActiveSectionFilter] = useState("Все");
+  const [draggedArticleId, setDraggedArticleId] = useState("");
 
   const isCustomArticle = (article) => article.id.startsWith("custom-");
 
@@ -396,6 +445,40 @@ function App() {
     setSearchMessage("Функциональность обновлена и переформулирована в формат справочника.");
   };
 
+  const handleCustomDragStart = (articleId) => {
+    setDraggedArticleId(articleId);
+  };
+
+  const handleCustomDrop = (targetArticleId) => {
+    if (!draggedArticleId || draggedArticleId === targetArticleId) return;
+
+    const draggedArticle = articles.find((item) => item.id === draggedArticleId);
+    const targetArticle = articles.find((item) => item.id === targetArticleId);
+
+    if (
+      !draggedArticle ||
+      !targetArticle ||
+      !isCustomArticle(draggedArticle) ||
+      !isCustomArticle(targetArticle) ||
+      draggedArticle.section !== targetArticle.section
+    ) {
+      setDraggedArticleId("");
+      return;
+    }
+
+    setArticles((prev) => {
+      const dragIndex = prev.findIndex((item) => item.id === draggedArticleId);
+      const targetIndex = prev.findIndex((item) => item.id === targetArticleId);
+      if (dragIndex < 0 || targetIndex < 0) return prev;
+
+      const updated = [...prev];
+      const [moved] = updated.splice(dragIndex, 1);
+      updated.splice(targetIndex, 0, moved);
+      return updated;
+    });
+    setDraggedArticleId("");
+  };
+
   return (
     <div className="page">
       <div className="content">
@@ -541,6 +624,9 @@ function App() {
                 Закрыть
               </button>
             </div>
+            <p className="drag-hint">
+              Совет: пользовательские статьи можно перетаскивать внутри одного раздела.
+            </p>
 
             <div className="section-filters">
               <button
@@ -581,6 +667,13 @@ function App() {
                     selectedArticle.id === article.id ? "knowledge-card--active" : ""
                   }`}
                   type="button"
+                  draggable={isCustomArticle(article)}
+                  onDragStart={() => handleCustomDragStart(article.id)}
+                  onDragOver={(event) => {
+                    if (isCustomArticle(article)) event.preventDefault();
+                  }}
+                  onDrop={() => handleCustomDrop(article.id)}
+                  onDragEnd={() => setDraggedArticleId("")}
                   onClick={() => {
                     setSelectedArticleId(article.id);
                     setSearchMessage("");
