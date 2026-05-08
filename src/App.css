@@ -347,26 +347,6 @@
   font-size: 13px;
 }
 
-.drag-hint {
-  margin: 0 0 12px;
-  font-size: 13px;
-  color: #32386d;
-}
-
-.secondary-button {
-  border: 1px solid #bdbdbd;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 14px;
-  color: #121239;
-  background: #ffffff;
-  cursor: pointer;
-}
-
-.secondary-button:hover {
-  border-color: #32386d;
-}
-
 .article-view {
   border: 1px solid #bdbdbd;
   border-radius: 12px;
