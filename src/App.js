@@ -43,11 +43,36 @@ const initialArticles = [
   }
 ];
 
+const CUSTOM_ARTICLES_STORAGE_KEY = "koncrit.customArticles";
+
+const loadCustomArticles = () => {
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_ARTICLES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item) =>
+        item &&
+        typeof item.id === "string" &&
+        typeof item.section === "string" &&
+        typeof item.title === "string" &&
+        typeof item.content === "string" &&
+        Array.isArray(item.keywords)
+    );
+  } catch {
+    return [];
+  }
+};
+
 function App() {
   const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
-  const [articles, setArticles] = useState(initialArticles);
+  const [articles, setArticles] = useState(() => [...loadCustomArticles(), ...initialArticles]);
   const [query, setQuery] = useState("");
-  const [selectedArticleId, setSelectedArticleId] = useState(initialArticles[0].id);
+  const [selectedArticleId, setSelectedArticleId] = useState(() => {
+    const customArticles = loadCustomArticles();
+    return customArticles[0]?.id ?? initialArticles[0].id;
+  });
   const [searchMessage, setSearchMessage] = useState("");
   const [newFeatureText, setNewFeatureText] = useState("");
   const [addMessage, setAddMessage] = useState("");
@@ -77,6 +102,11 @@ function App() {
       setSelectedArticleId(articles[0].id);
     }
   }, [articles, selectedArticleId]);
+
+  useEffect(() => {
+    const customArticles = articles.filter((article) => article.section === "Новый функционал");
+    window.localStorage.setItem(CUSTOM_ARTICLES_STORAGE_KEY, JSON.stringify(customArticles));
+  }, [articles]);
 
   const openKnowledgeBase = () => {
     setSearchMessage("");
