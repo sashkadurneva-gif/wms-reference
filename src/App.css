@@ -26,6 +26,10 @@
   color: #121239;
 }
 
+.hero h1 span {
+  color: #32386d;
+}
+
 .subtitle {
   margin-top: 12px;
   margin-bottom: 22px;
@@ -35,18 +39,19 @@
 }
 
 .primary-button {
-  border: 1px solid #121239;
+  border: 1px solid #32386d;
   border-radius: 10px;
   padding: 12px 18px;
   font-size: 15px;
   font-weight: 600;
   color: #ffffff;
-  background: #121239;
+  background: #32386d;
   cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
 .primary-button:hover {
-  background: #32386d;
+  background: #121239;
 }
 
 .cards {
@@ -70,15 +75,4 @@
 .card p {
   margin: 0;
   color: #32386d;
-}
-
-.footer {
-  margin-top: 30px;
-  padding-top: 16px;
-  border-top: 1px solid #bdbdbd;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px 24px;
-  color: #32386d;
-  font-size: 14px;
 }

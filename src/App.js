@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import "./App.css";
 
 const sections = [
@@ -17,20 +17,28 @@ const sections = [
 ];
 
 function App() {
+  const cardsRef = useRef(null);
+
+  const openKnowledgeBase = useCallback(() => {
+    cardsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   return (
     <div className="page">
       <header className="hero">
-        <p className="tag">Складская справочная система</p>
-        <h1>KONCRIT</h1>
+        <p className="tag">Справочная система</p>
+        <h1>
+          KON<span>CRIT</span>
+        </h1>
         <p className="subtitle">
           Быстрый доступ к основным процессам склада: от приемки до отгрузки.
         </p>
-        <button className="primary-button" type="button">
+        <button className="primary-button" type="button" onClick={openKnowledgeBase}>
           Открыть базу знаний
         </button>
       </header>
 
-      <div className="cards">
+      <div className="cards" ref={cardsRef}>
         {sections.map((item) => (
           <section key={item.title} className="card">
             <h3>{item.title}</h3>
@@ -38,11 +46,6 @@ function App() {
           </section>
         ))}
       </div>
-
-      <footer className="footer">
-        <span>Поддержка: support@koncrit.ru</span>
-        <span>Телефон: +7 (999) 123-45-67</span>
-      </footer>
     </div>
   );
 }
