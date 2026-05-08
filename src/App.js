@@ -101,7 +101,7 @@ const toProcessSentence = (text) => {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 };
 
-const buildKnowledgeArticleFromInput = (rawInput, existingId) => {
+const buildKnowledgeArticleFromInput = (rawInput, section, existingId) => {
   const normalizedInput = rawInput.trim().replace(/\s+/g, " ");
   const clauses = normalizedInput
     .split(/[.!?;]+/)
@@ -143,7 +143,7 @@ const buildKnowledgeArticleFromInput = (rawInput, existingId) => {
 
   return {
     id: existingId ?? `custom-${Date.now()}`,
-    section: "Новый функционал",
+    section,
     title,
     content,
     keywords,
@@ -162,8 +162,15 @@ function App() {
   });
   const [searchMessage, setSearchMessage] = useState("");
   const [newFeatureText, setNewFeatureText] = useState("");
+  const [newFeatureSection, setNewFeatureSection] = useState(sections[0].title);
   const [addMessage, setAddMessage] = useState("");
   const [isDiagramView, setIsDiagramView] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editArticleId, setEditArticleId] = useState("");
+  const [editFeatureText, setEditFeatureText] = useState("");
+  const [editFeatureSection, setEditFeatureSection] = useState(sections[0].title);
+
+  const isCustomArticle = (article) => article.id.startsWith("custom-");
 
   const selectedArticle = useMemo(
     () => articles.find((article) => article.id === selectedArticleId) ?? articles[0],
@@ -191,13 +198,16 @@ function App() {
   }, [articles, selectedArticleId]);
 
   useEffect(() => {
-    const customArticles = articles.filter((article) => article.section === "Новый функционал");
+    const customArticles = articles.filter((article) => isCustomArticle(article));
     const normalizedCustomArticles = customArticles.map((article) => {
       if (article.templateVersion === ARTICLE_TEMPLATE_VERSION && article.sourceRaw) {
         return article;
       }
       const fallbackSource = article.sourceRaw || article.title || article.content;
-      return buildKnowledgeArticleFromInput(fallbackSource, article.id);
+      const validSection = sections.some((item) => item.title === article.section)
+        ? article.section
+        : sections[0].title;
+      return buildKnowledgeArticleFromInput(fallbackSource, validSection, article.id);
     });
     window.localStorage.setItem(
       CUSTOM_ARTICLES_STORAGE_KEY,
@@ -266,12 +276,17 @@ function App() {
       .find((line) => line && !line.endsWith(":")) || "Описание отсутствует.";
 
   const processTree = useMemo(() => {
-    return [
-      { group: "Приемка", status: "Реализовано", children: ["Проверка поставки по накладной"] },
-      { group: "Хранение", status: "Реализовано", children: ["Адресное размещение товара"] },
-      { group: "Отгрузка", status: "Реализовано", children: ["Чек-лист перед отгрузкой"] }
-    ];
-  }, []);
+    return sections.map((sectionItem) => {
+      const nodes = articles
+        .filter((article) => article.section === sectionItem.title)
+        .map((article) => article.title);
+      return {
+        group: sectionItem.title,
+        status: "Реализовано",
+        children: nodes
+      };
+    });
+  }, [articles]);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -314,7 +329,7 @@ function App() {
       return;
     }
 
-    const newArticle = buildKnowledgeArticleFromInput(rawDescription);
+    const newArticle = buildKnowledgeArticleFromInput(rawDescription, newFeatureSection);
 
     setArticles((prev) => [newArticle, ...prev]);
     setSelectedArticleId(newArticle.id);
@@ -322,11 +337,12 @@ function App() {
     setSearchMessage(`Добавлена статья: ${newArticle.title}`);
     setAddMessage("Описание преобразовано в формат справочника и добавлено в базу знаний.");
     setNewFeatureText("");
+    setNewFeatureSection(sections[0].title);
   };
 
   const handleDeleteFeature = (articleId) => {
     const articleToDelete = articles.find((article) => article.id === articleId);
-    if (!articleToDelete || articleToDelete.section !== "Новый функционал") {
+    if (!articleToDelete || !isCustomArticle(articleToDelete)) {
       return;
     }
 
@@ -336,26 +352,35 @@ function App() {
 
   const handleEditFeature = (articleId) => {
     const articleToEdit = articles.find((article) => article.id === articleId);
-    if (!articleToEdit || articleToEdit.section !== "Новый функционал") {
+    if (!articleToEdit || !isCustomArticle(articleToEdit)) {
+      return;
+    }
+    setEditArticleId(articleToEdit.id);
+    setEditFeatureText(articleToEdit.sourceRaw || articleToEdit.title.replace("Функция: ", ""));
+    setEditFeatureSection(articleToEdit.section);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEditFeature = (event) => {
+    event.preventDefault();
+    const normalized = editFeatureText.trim();
+    if (!normalized) {
+      setSearchMessage("Заполните описание для сохранения изменений.");
       return;
     }
 
-    const updatedDescription = window.prompt(
-      "Обновите описание функциональности:",
-      articleToEdit.sourceRaw || articleToEdit.title.replace("Функция: ", "")
+    const updatedArticle = buildKnowledgeArticleFromInput(
+      normalized,
+      editFeatureSection,
+      editArticleId
     );
-
-    if (!updatedDescription || !updatedDescription.trim()) {
-      return;
-    }
-
-    const normalized = updatedDescription.trim();
-    const updatedArticle = buildKnowledgeArticleFromInput(normalized, articleId);
     setArticles((prev) =>
       prev.map((article) =>
-        article.id === articleId ? updatedArticle : article
+        article.id === editArticleId ? updatedArticle : article
       )
     );
+    setSelectedArticleId(updatedArticle.id);
+    setIsEditModalOpen(false);
     setSearchMessage("Функциональность обновлена и переформулирована в формат справочника.");
   };
 
@@ -386,6 +411,17 @@ function App() {
             </form>
           </div>
           <form className="add-feature-form" onSubmit={handleAddFeature}>
+            <select
+              className="feature-section-select"
+              value={newFeatureSection}
+              onChange={(event) => setNewFeatureSection(event.target.value)}
+            >
+              {sections.map((item) => (
+                <option key={`add-${item.title}`} value={item.title}>
+                  {item.title}
+                </option>
+              ))}
+            </select>
             <textarea
               className="feature-input"
               value={newFeatureText}
@@ -425,9 +461,11 @@ function App() {
                     <span className="process-status process-status--done">{node.status}</span>
                   </div>
                   <ul>
-                    {node.children.map((child) => (
-                      <li key={`${node.group}-${child}`}>{child}</li>
-                    ))}
+                    {node.children.length > 0 ? (
+                      node.children.map((child) => <li key={`${node.group}-${child}`}>{child}</li>)
+                    ) : (
+                      <li>Подразделы пока не добавлены</li>
+                    )}
                   </ul>
                 </li>
               ))}
@@ -440,7 +478,9 @@ function App() {
                   <div key={`diagram-${node.group}`} className="diagram-branch">
                     <div className="diagram-node">{node.group}</div>
                     <div className="diagram-arrow">↓</div>
-                    <div className="diagram-leaf">{node.children[0]}</div>
+                    <div className="diagram-leaf">
+                      {node.children.length > 0 ? node.children[0] : "Подразделы пока не добавлены"}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -494,7 +534,7 @@ function App() {
                 >
                   <h3>{article.title}</h3>
                   <p>{getArticleSummary(article.content)}</p>
-                  {article.section === "Новый функционал" && (
+                  {isCustomArticle(article) && (
                     <div className="feature-actions">
                       <span
                         className="feature-action-link"
@@ -537,6 +577,53 @@ function App() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {isEditModalOpen && (
+        <div
+          className="edit-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsEditModalOpen(false);
+            }
+          }}
+        >
+          <div className="edit-content">
+            <h2>Редактирование функциональности</h2>
+            <form className="edit-form" onSubmit={handleSaveEditFeature}>
+              <select
+                className="feature-section-select"
+                value={editFeatureSection}
+                onChange={(event) => setEditFeatureSection(event.target.value)}
+              >
+                {sections.map((item) => (
+                  <option key={`edit-${item.title}`} value={item.title}>
+                    {item.title}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                className="edit-textarea"
+                value={editFeatureText}
+                onChange={(event) => setEditFeatureText(event.target.value)}
+              />
+              <div className="edit-actions">
+                <button className="add-feature-button" type="submit">
+                  Сохранить
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                >
+                  Отмена
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
