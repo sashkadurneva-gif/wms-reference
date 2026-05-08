@@ -16,7 +16,7 @@ const sections = [
   }
 ];
 
-const articles = [
+const initialArticles = [
   {
     id: "receiving-rules",
     section: "Приемка",
@@ -45,13 +45,16 @@ const articles = [
 
 function App() {
   const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
+  const [articles, setArticles] = useState(initialArticles);
   const [query, setQuery] = useState("");
-  const [selectedArticleId, setSelectedArticleId] = useState(articles[0].id);
+  const [selectedArticleId, setSelectedArticleId] = useState(initialArticles[0].id);
   const [searchMessage, setSearchMessage] = useState("");
+  const [newFeatureText, setNewFeatureText] = useState("");
+  const [addMessage, setAddMessage] = useState("");
 
   const selectedArticle = useMemo(
     () => articles.find((article) => article.id === selectedArticleId) ?? articles[0],
-    [selectedArticleId]
+    [articles, selectedArticleId]
   );
 
   useEffect(() => {
@@ -71,6 +74,40 @@ function App() {
     setSearchMessage("");
     setIsKnowledgeBaseOpen(true);
   };
+
+  const splitWithHighlight = (text, phrase) => {
+    const normalizedPhrase = phrase.trim();
+    if (!normalizedPhrase) return [text];
+
+    const escaped = normalizedPhrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(${escaped})`, "gi");
+    return text.split(regex);
+  };
+
+  const renderWithHighlight = (text, phrase) =>
+    splitWithHighlight(text, phrase).map((part, index) =>
+      part.toLowerCase() === phrase.trim().toLowerCase() ? (
+        <mark key={`${part}-${index}`} className="search-highlight">
+          {part}
+        </mark>
+      ) : (
+        <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>
+      )
+    );
+
+  const processTree = useMemo(() => {
+    const customArticles = articles.filter((article) => article.section === "Новый функционал");
+    return [
+      { group: "Приемка", status: "Реализовано", children: ["Проверка поставки по накладной"] },
+      { group: "Хранение", status: "Реализовано", children: ["Адресное размещение товара"] },
+      { group: "Отгрузка", status: "Реализовано", children: ["Чек-лист перед отгрузкой"] },
+      {
+        group: "Новый функционал",
+        status: customArticles.length ? "В разработке" : "Пусто",
+        children: customArticles.map((article) => article.title)
+      }
+    ];
+  }, [articles]);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -104,6 +141,34 @@ function App() {
     setSearchMessage(`Открыта статья: ${match.title}`);
   };
 
+  const handleAddFeature = (event) => {
+    event.preventDefault();
+    const rawDescription = newFeatureText.trim();
+
+    if (!rawDescription) {
+      setAddMessage("Добавьте описание новой функциональности.");
+      return;
+    }
+
+    const newArticle = {
+      id: `custom-${Date.now()}`,
+      section: "Новый функционал",
+      title: `Новая функция: ${rawDescription.slice(0, 42)}${rawDescription.length > 42 ? "..." : ""}`,
+      content: `Пользовательское описание: ${rawDescription}. Система добавила этот функционал в структуру базы знаний понятным языком.`,
+      keywords: rawDescription
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((word) => word.length > 3)
+    };
+
+    setArticles((prev) => [newArticle, ...prev]);
+    setSelectedArticleId(newArticle.id);
+    setIsKnowledgeBaseOpen(true);
+    setSearchMessage(`Добавлена статья: ${newArticle.title}`);
+    setAddMessage("Функциональность добавлена в структуру справочной системы.");
+    setNewFeatureText("");
+  };
+
   return (
     <div className="page">
       <div className="content">
@@ -130,6 +195,18 @@ function App() {
               </button>
             </form>
           </div>
+          <form className="add-feature-form" onSubmit={handleAddFeature}>
+            <textarea
+              className="feature-input"
+              value={newFeatureText}
+              onChange={(event) => setNewFeatureText(event.target.value)}
+              placeholder="Добавить функциональность: опишите новую возможность системы простыми словами"
+            />
+            <button className="add-feature-button" type="submit">
+              Добавить функциональность
+            </button>
+          </form>
+          {addMessage && <p className="add-message">{addMessage}</p>}
         </header>
 
         <div className="cards">
@@ -140,6 +217,37 @@ function App() {
             </section>
           ))}
         </div>
+
+        <section className="process-tree">
+          <h2>Дерево процессов</h2>
+          <ul className="process-list">
+            {processTree.map((node) => (
+              <li key={node.group} className="process-node">
+                <div className="process-title-row">
+                  <strong>{node.group}</strong>
+                  <span
+                    className={`process-status ${
+                      node.status === "Реализовано"
+                        ? "process-status--done"
+                        : node.status === "В разработке"
+                          ? "process-status--progress"
+                          : "process-status--empty"
+                    }`}
+                  >
+                    {node.status}
+                  </span>
+                </div>
+                <ul>
+                  {node.children.length ? (
+                    node.children.map((child) => <li key={`${node.group}-${child}`}>{child}</li>)
+                  ) : (
+                    <li>Пока нет добавленных процессов</li>
+                  )}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
 
       {isKnowledgeBaseOpen && (
@@ -167,8 +275,8 @@ function App() {
 
             <article className="article-view">
               <p className="article-section">{selectedArticle.section}</p>
-              <h3>{selectedArticle.title}</h3>
-              <p>{selectedArticle.content}</p>
+              <h3>{renderWithHighlight(selectedArticle.title, query)}</h3>
+              <p>{renderWithHighlight(selectedArticle.content, query)}</p>
               {searchMessage && <p className="search-message">{searchMessage}</p>}
             </article>
 

@@ -45,6 +45,7 @@
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+  margin-bottom: 12px;
 }
 
 .primary-button {
@@ -98,10 +99,54 @@
   background: #f5f5f5;
 }
 
+.add-feature-form {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 12px;
+}
+
+.feature-input {
+  flex: 1;
+  min-height: 84px;
+  border: 1px solid #bdbdbd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  resize: vertical;
+  color: #121239;
+  background: #ffffff;
+}
+
+.feature-input:focus {
+  outline: 1px solid #32386d;
+}
+
+.add-feature-button {
+  border: 1px solid #32386d;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #32386d;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-feature-button:hover {
+  background: #121239;
+}
+
+.add-message {
+  margin: 10px 0 0;
+  color: #32386d;
+  font-size: 14px;
+}
+
 .cards {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin-bottom: 20px;
 }
 
 .card {
@@ -119,6 +164,60 @@
 .card p {
   margin: 0;
   color: #32386d;
+}
+
+.process-tree {
+  border: 1px solid #bdbdbd;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.process-tree h2 {
+  margin: 0 0 12px;
+  color: #32386d;
+  font-size: 22px;
+}
+
+.process-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.process-node > ul {
+  margin-top: 8px;
+  color: #121239;
+}
+
+.process-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.process-status {
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  border: 1px solid #bdbdbd;
+}
+
+.process-status--done {
+  color: #ffffff;
+  background: #32386d;
+  border-color: #32386d;
+}
+
+.process-status--progress {
+  color: #121239;
+  background: #f5f5f5;
+}
+
+.process-status--empty {
+  color: #32386d;
+  background: #ffffff;
 }
 
 .knowledge-overlay {
@@ -198,6 +297,13 @@
   font-size: 14px;
 }
 
+.search-highlight {
+  background: #bdbdbd;
+  color: #121239;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
 .knowledge-grid {
   display: grid;
   gap: 16px;
@@ -231,5 +337,13 @@
 @media (max-width: 768px) {
   .search-form {
     min-width: 100%;
+  }
+
+  .add-feature-form {
+    flex-direction: column;
+  }
+
+  .add-feature-button {
+    width: 100%;
   }
 }
