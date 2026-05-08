@@ -92,6 +92,7 @@ const initialArticles = [
 ];
 
 const CUSTOM_ARTICLES_STORAGE_KEY = "koncrit.customArticles";
+const FAVORITES_STORAGE_KEY = "koncrit.favoriteArticleIds";
 const ARTICLE_TEMPLATE_VERSION = 2;
 
 const TEMPLATE_RESULT_TEXT =
@@ -119,6 +120,18 @@ const loadCustomArticles = () => {
         templateVersion:
           typeof item.templateVersion === "number" ? item.templateVersion : ARTICLE_TEMPLATE_VERSION
       }));
+  } catch {
+    return [];
+  }
+};
+
+const loadFavoriteArticleIds = () => {
+  try {
+    const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => typeof item === "string");
   } catch {
     return [];
   }
@@ -219,6 +232,8 @@ function App() {
   const [editFeatureSection, setEditFeatureSection] = useState(sections[0].title);
   const [activeSectionFilter, setActiveSectionFilter] = useState("Все");
   const [draggedArticleId, setDraggedArticleId] = useState("");
+  const [dropTargetArticleId, setDropTargetArticleId] = useState("");
+  const [favoriteArticleIds, setFavoriteArticleIds] = useState(() => loadFavoriteArticleIds());
 
   const isCustomArticle = (article) => article.id.startsWith("custom-");
 
@@ -229,6 +244,10 @@ function App() {
   const customArticlesCount = useMemo(
     () => articles.filter((article) => isCustomArticle(article)).length,
     [articles]
+  );
+  const favoritesCount = useMemo(
+    () => articles.filter((article) => favoriteArticleIds.includes(article.id)).length,
+    [articles, favoriteArticleIds]
   );
 
   useEffect(() => {
@@ -268,6 +287,10 @@ function App() {
       JSON.stringify(normalizedCustomArticles)
     );
   }, [articles]);
+
+  useEffect(() => {
+    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteArticleIds));
+  }, [favoriteArticleIds]);
 
   const openKnowledgeBase = () => {
     setSearchMessage("");
@@ -346,8 +369,11 @@ function App() {
     if (activeSectionFilter === "Все") {
       return articles;
     }
+    if (activeSectionFilter === "Избранное") {
+      return articles.filter((article) => favoriteArticleIds.includes(article.id));
+    }
     return articles.filter((article) => article.section === activeSectionFilter);
-  }, [activeSectionFilter, articles]);
+  }, [activeSectionFilter, articles, favoriteArticleIds]);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -463,6 +489,7 @@ function App() {
       draggedArticle.section !== targetArticle.section
     ) {
       setDraggedArticleId("");
+      setDropTargetArticleId("");
       return;
     }
 
@@ -477,6 +504,26 @@ function App() {
       return updated;
     });
     setDraggedArticleId("");
+    setDropTargetArticleId("");
+  };
+
+  const toggleFavorite = (articleId) => {
+    setFavoriteArticleIds((prev) =>
+      prev.includes(articleId) ? prev.filter((id) => id !== articleId) : [...prev, articleId]
+    );
+  };
+
+  const exportCustomArticles = () => {
+    const customArticles = articles.filter((article) => isCustomArticle(article));
+    const payload = JSON.stringify(customArticles, null, 2);
+    const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "koncrit-custom-articles.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setSearchMessage("Экспортировано: koncrit-custom-articles.json");
   };
 
   return (
@@ -572,27 +619,32 @@ function App() {
               ))}
             </ul>
           ) : (
-            <div className="process-diagram">
-              <div className="diagram-root">KONCRIT WMS</div>
-              <div className="diagram-branches">
-                {processTree.map((node) => (
-                  <div key={`diagram-${node.group}`} className="diagram-branch">
-                    <div className="diagram-node">{node.group}</div>
-                    <div className="diagram-arrow">↓</div>
-                    {node.children.length > 0 ? (
-                      <ul className="diagram-leaf-list">
-                        {node.children.map((child) => (
-                          <li key={`diagram-child-${node.group}-${child}`} className="diagram-leaf">
-                            {child}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="diagram-leaf">Подразделы пока не добавлены</div>
-                    )}
-                  </div>
-                ))}
-              </div>
+            <div className="process-diagram tree-diagram">
+              <ul>
+                <li>
+                  <span className="diagram-root">KONCRIT WMS</span>
+                  <ul>
+                    {processTree.map((node) => (
+                      <li key={`diagram-${node.group}`}>
+                        <span className="diagram-node">{node.group}</span>
+                        <ul>
+                          {node.children.length > 0 ? (
+                            node.children.map((child) => (
+                              <li key={`diagram-child-${node.group}-${child}`}>
+                                <span className="diagram-leaf">{child}</span>
+                              </li>
+                            ))
+                          ) : (
+                            <li>
+                              <span className="diagram-leaf">Подразделы пока не добавлены</span>
+                            </li>
+                          )}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              </ul>
             </div>
           )}
         </section>
@@ -615,7 +667,11 @@ function App() {
               <div className="knowledge-meta">
                 <span>Всего статей: {articles.length}</span>
                 <span>Пользовательских: {customArticlesCount}</span>
+                <span>Избранных: {favoritesCount}</span>
               </div>
+              <button className="secondary-button" type="button" onClick={exportCustomArticles}>
+                Экспорт custom-статей
+              </button>
               <button
                 className="secondary-button"
                 type="button"
@@ -637,6 +693,15 @@ function App() {
                 onClick={() => setActiveSectionFilter("Все")}
               >
                 Все
+              </button>
+              <button
+                type="button"
+                className={`section-filter-btn ${
+                  activeSectionFilter === "Избранное" ? "section-filter-btn--active" : ""
+                }`}
+                onClick={() => setActiveSectionFilter("Избранное")}
+              >
+                Избранное
               </button>
               {sections.map((sectionItem) => (
                 <button
@@ -665,15 +730,24 @@ function App() {
                   key={article.id}
                   className={`knowledge-card ${
                     selectedArticle.id === article.id ? "knowledge-card--active" : ""
-                  }`}
+                  } ${dropTargetArticleId === article.id ? "knowledge-card--drop-target" : ""}`}
                   type="button"
                   draggable={isCustomArticle(article)}
                   onDragStart={() => handleCustomDragStart(article.id)}
                   onDragOver={(event) => {
-                    if (isCustomArticle(article)) event.preventDefault();
+                    if (isCustomArticle(article)) {
+                      event.preventDefault();
+                      setDropTargetArticleId(article.id);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (dropTargetArticleId === article.id) setDropTargetArticleId("");
                   }}
                   onDrop={() => handleCustomDrop(article.id)}
-                  onDragEnd={() => setDraggedArticleId("")}
+                  onDragEnd={() => {
+                    setDraggedArticleId("");
+                    setDropTargetArticleId("");
+                  }}
                   onClick={() => {
                     setSelectedArticleId(article.id);
                     setSearchMessage("");
@@ -681,6 +755,29 @@ function App() {
                 >
                   <h3>{article.title}</h3>
                   <p>{getArticleSummary(article.content)}</p>
+                  <div className="card-meta-row">
+                    <span className="article-chip">{article.section}</span>
+                    <span
+                      className={`favorite-star ${
+                        favoriteArticleIds.includes(article.id) ? "favorite-star--active" : ""
+                      }`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggleFavorite(article.id);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          toggleFavorite(article.id);
+                        }
+                      }}
+                    >
+                      ★
+                    </span>
+                  </div>
                   {isCustomArticle(article) && (
                     <div className="feature-actions">
                       <span

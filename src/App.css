@@ -241,6 +241,36 @@
   gap: 16px;
 }
 
+.tree-diagram ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 24px;
+  position: relative;
+}
+
+.tree-diagram ul ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 12px;
+  left: 10px;
+  border-left: 1px solid #bdbdbd;
+}
+
+.tree-diagram li {
+  position: relative;
+  margin: 8px 0;
+}
+
+.tree-diagram li::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: -14px;
+  width: 14px;
+  border-top: 1px solid #bdbdbd;
+}
+
 .diagram-root {
   border: 1px solid #32386d;
   border-radius: 10px;
@@ -277,13 +307,6 @@
 .diagram-leaf {
   color: #121239;
   font-size: 14px;
-}
-
-.diagram-leaf-list {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
 }
 
 .knowledge-overlay {
@@ -472,6 +495,36 @@
 .knowledge-card--active {
   border-color: #32386d;
   box-shadow: 0 0 0 1px #32386d inset;
+}
+
+.knowledge-card--drop-target {
+  border-color: #121239;
+  box-shadow: 0 0 0 2px #121239 inset;
+}
+
+.card-meta-row {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.article-chip {
+  font-size: 12px;
+  color: #32386d;
+  border: 1px solid #bdbdbd;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.favorite-star {
+  color: #bdbdbd;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.favorite-star--active {
+  color: #32386d;
 }
 
 .edit-overlay {
