@@ -669,9 +669,6 @@ function App() {
                 <span>Пользовательских: {customArticlesCount}</span>
                 <span>Избранных: {favoritesCount}</span>
               </div>
-              <button className="secondary-button" type="button" onClick={exportCustomArticles}>
-                Экспорт custom-статей
-              </button>
               <button
                 className="secondary-button"
                 type="button"
@@ -680,9 +677,6 @@ function App() {
                 Закрыть
               </button>
             </div>
-            <p className="drag-hint">
-              Совет: пользовательские статьи можно перетаскивать внутри одного раздела.
-            </p>
 
             <div className="section-filters">
               <button
