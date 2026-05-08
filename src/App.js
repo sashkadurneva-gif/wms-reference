@@ -65,6 +65,70 @@ const loadCustomArticles = () => {
   }
 };
 
+const STOP_WORDS = new Set([
+  "и",
+  "в",
+  "на",
+  "по",
+  "для",
+  "с",
+  "что",
+  "это",
+  "как",
+  "или",
+  "из",
+  "под",
+  "к",
+  "у",
+  "о",
+  "об"
+]);
+
+const toProcessSentence = (text) => {
+  const trimmed = text.trim().replace(/\s+/g, " ");
+  if (!trimmed) return "";
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+};
+
+const buildKnowledgeArticleFromInput = (rawInput, existingId) => {
+  const normalizedInput = rawInput.trim().replace(/\s+/g, " ");
+  const clauses = normalizedInput
+    .split(/[.!?;]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const firstClause = clauses[0] || normalizedInput;
+  const titleBase = toProcessSentence(firstClause);
+  const title = `Функция: ${titleBase.slice(0, 52)}${titleBase.length > 52 ? "..." : ""}`;
+
+  const steps = clauses.slice(0, 3).map((clause) => toProcessSentence(clause));
+  const fallbackStep = "Определите сценарий использования и ожидаемый результат.";
+  while (steps.length < 3) {
+    steps.push(fallbackStep);
+  }
+
+  const keywords = normalizedInput
+    .toLowerCase()
+    .replace(/[^a-zа-яё0-9\s-]/gi, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 3 && !STOP_WORDS.has(word))
+    .slice(0, 8);
+
+  const content =
+    "Описание в формате справочника: " +
+    `${steps[0]}. Затем ${steps[1].charAt(0).toLowerCase()}${steps[1].slice(1)}. ` +
+    `После этого ${steps[2].charAt(0).toLowerCase()}${steps[2].slice(1)}. ` +
+    "Результат: процесс выполняется предсказуемо и прозрачно для пользователя.";
+
+  return {
+    id: existingId ?? `custom-${Date.now()}`,
+    section: "Новый функционал",
+    title,
+    content,
+    keywords
+  };
+};
+
 function App() {
   const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
   const [articles, setArticles] = useState(() => [...loadCustomArticles(), ...initialArticles]);
@@ -182,22 +246,13 @@ function App() {
       return;
     }
 
-    const newArticle = {
-      id: `custom-${Date.now()}`,
-      section: "Новый функционал",
-      title: `Новая функция: ${rawDescription.slice(0, 42)}${rawDescription.length > 42 ? "..." : ""}`,
-      content: `Пользовательское описание: ${rawDescription}. Система добавила этот функционал в структуру базы знаний понятным языком.`,
-      keywords: rawDescription
-        .toLowerCase()
-        .split(/\s+/)
-        .filter((word) => word.length > 3)
-    };
+    const newArticle = buildKnowledgeArticleFromInput(rawDescription);
 
     setArticles((prev) => [newArticle, ...prev]);
     setSelectedArticleId(newArticle.id);
     setIsKnowledgeBaseOpen(true);
     setSearchMessage(`Добавлена статья: ${newArticle.title}`);
-    setAddMessage("Функциональность добавлена в структуру справочной системы.");
+    setAddMessage("Описание преобразовано в формат справочника и добавлено в базу знаний.");
     setNewFeatureText("");
   };
 
@@ -236,24 +291,13 @@ function App() {
     }
 
     const normalized = updatedDescription.trim();
+    const updatedArticle = buildKnowledgeArticleFromInput(normalized, articleId);
     setArticles((prev) =>
       prev.map((article) =>
-        article.id === articleId
-          ? {
-              ...article,
-              title: `Новая функция: ${normalized.slice(0, 42)}${
-                normalized.length > 42 ? "..." : ""
-              }`,
-              content: `Пользовательское описание: ${normalized}. Система добавила этот функционал в структуру базы знаний понятным языком.`,
-              keywords: normalized
-                .toLowerCase()
-                .split(/\s+/)
-                .filter((word) => word.length > 3)
-            }
-          : article
+        article.id === articleId ? updatedArticle : article
       )
     );
-    setSearchMessage("Функциональность обновлена.");
+    setSearchMessage("Функциональность обновлена и переформулирована в формат справочника.");
   };
 
   return (
