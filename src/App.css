@@ -40,6 +40,13 @@
   font-size: 18px;
 }
 
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 .primary-button {
   border: 1px solid #32386d;
   border-radius: 10px;
@@ -54,6 +61,41 @@
 
 .primary-button:hover {
   background: #121239;
+}
+
+.search-form {
+  display: flex;
+  flex: 1;
+  min-width: 280px;
+  gap: 8px;
+}
+
+.search-input {
+  flex: 1;
+  border: 1px solid #bdbdbd;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #121239;
+}
+
+.search-input:focus {
+  outline: 1px solid #32386d;
+}
+
+.search-button {
+  border: 1px solid #32386d;
+  border-radius: 10px;
+  padding: 12px 16px;
+  background: #ffffff;
+  color: #32386d;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.search-button:hover {
+  background: #f5f5f5;
 }
 
 .cards {
@@ -83,14 +125,22 @@
   position: fixed;
   inset: 0;
   z-index: 10;
-  background: #f5f5f5;
+  background: rgba(18, 18, 57, 0.32);
   padding: 28px 20px;
   overflow-y: auto;
 }
 
-.knowledge-header {
-  margin: 0 auto 24px;
+.knowledge-content {
   max-width: 1100px;
+  margin: 0 auto;
+  background: #f5f5f5;
+  border-radius: 14px;
+  padding: 20px;
+  border: 1px solid #bdbdbd;
+}
+
+.knowledge-header {
+  margin: 0 auto 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -116,9 +166,39 @@
   border-color: #32386d;
 }
 
+.article-view {
+  border: 1px solid #bdbdbd;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.article-section {
+  margin: 0 0 8px;
+  color: #32386d;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.article-view h3 {
+  margin: 0 0 10px;
+  color: #32386d;
+}
+
+.article-view p {
+  margin: 0;
+  color: #121239;
+}
+
+.search-message {
+  margin-top: 10px !important;
+  color: #32386d !important;
+  font-size: 14px;
+}
+
 .knowledge-grid {
-  margin: 0 auto;
-  max-width: 1100px;
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -129,6 +209,8 @@
   border-radius: 12px;
   padding: 18px;
   background: #ffffff;
+  text-align: left;
+  cursor: pointer;
 }
 
 .knowledge-card h3 {
@@ -137,12 +219,17 @@
 }
 
 .knowledge-card p {
-  margin: 0 0 12px;
+  margin: 0;
   color: #121239;
 }
 
-.knowledge-card ul {
-  margin: 0;
-  padding-left: 18px;
-  color: #32386d;
+.knowledge-card--active {
+  border-color: #32386d;
+  box-shadow: 0 0 0 1px #32386d inset;
+}
+
+@media (max-width: 768px) {
+  .search-form {
+    min-width: 100%;
+  }
 }
