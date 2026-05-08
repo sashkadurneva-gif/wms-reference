@@ -329,6 +329,20 @@
   color: #121239;
 }
 
+.article-block + .article-block {
+  margin-top: 10px;
+}
+
+.article-block h4 {
+  margin: 0 0 6px;
+  color: #32386d;
+  font-size: 14px;
+}
+
+.article-block p + p {
+  margin-top: 6px;
+}
+
 .search-message {
   margin-top: 10px !important;
   color: #32386d !important;

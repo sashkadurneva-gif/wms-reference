@@ -44,6 +44,10 @@ const initialArticles = [
 ];
 
 const CUSTOM_ARTICLES_STORAGE_KEY = "koncrit.customArticles";
+const ARTICLE_TEMPLATE_VERSION = 2;
+
+const TEMPLATE_RESULT_TEXT =
+  "Пользователь получает понятный и повторяемый сценарий работы в системе.";
 
 const loadCustomArticles = () => {
   try {
@@ -51,15 +55,22 @@ const loadCustomArticles = () => {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item) =>
-        item &&
-        typeof item.id === "string" &&
-        typeof item.section === "string" &&
-        typeof item.title === "string" &&
-        typeof item.content === "string" &&
-        Array.isArray(item.keywords)
-    );
+    return parsed
+      .filter(
+        (item) =>
+          item &&
+          typeof item.id === "string" &&
+          typeof item.section === "string" &&
+          typeof item.title === "string" &&
+          typeof item.content === "string" &&
+          Array.isArray(item.keywords)
+      )
+      .map((item) => ({
+        ...item,
+        sourceRaw: typeof item.sourceRaw === "string" ? item.sourceRaw : "",
+        templateVersion:
+          typeof item.templateVersion === "number" ? item.templateVersion : ARTICLE_TEMPLATE_VERSION
+      }));
   } catch {
     return [];
   }
@@ -114,18 +125,30 @@ const buildKnowledgeArticleFromInput = (rawInput, existingId) => {
     .filter((word) => word.length > 3 && !STOP_WORDS.has(word))
     .slice(0, 8);
 
-  const content =
-    "Описание в формате справочника: " +
-    `${steps[0]}. Затем ${steps[1].charAt(0).toLowerCase()}${steps[1].slice(1)}. ` +
-    `После этого ${steps[2].charAt(0).toLowerCase()}${steps[2].slice(1)}. ` +
-    "Результат: процесс выполняется предсказуемо и прозрачно для пользователя.";
+  const content = [
+    "Цель:",
+    `Обеспечить выполнение функции: ${titleBase}.`,
+    "",
+    "Когда использовать:",
+    `Когда требуется сценарий: ${titleBase.toLowerCase()}.`,
+    "",
+    "Пошагово:",
+    `1. ${steps[0]}.`,
+    `2. ${steps[1]}.`,
+    `3. ${steps[2]}.`,
+    "",
+    "Результат:",
+    TEMPLATE_RESULT_TEXT
+  ].join("\n");
 
   return {
     id: existingId ?? `custom-${Date.now()}`,
     section: "Новый функционал",
     title,
     content,
-    keywords
+    keywords,
+    sourceRaw: normalizedInput,
+    templateVersion: ARTICLE_TEMPLATE_VERSION
   };
 };
 
@@ -169,7 +192,17 @@ function App() {
 
   useEffect(() => {
     const customArticles = articles.filter((article) => article.section === "Новый функционал");
-    window.localStorage.setItem(CUSTOM_ARTICLES_STORAGE_KEY, JSON.stringify(customArticles));
+    const normalizedCustomArticles = customArticles.map((article) => {
+      if (article.templateVersion === ARTICLE_TEMPLATE_VERSION && article.sourceRaw) {
+        return article;
+      }
+      const fallbackSource = article.sourceRaw || article.title || article.content;
+      return buildKnowledgeArticleFromInput(fallbackSource, article.id);
+    });
+    window.localStorage.setItem(
+      CUSTOM_ARTICLES_STORAGE_KEY,
+      JSON.stringify(normalizedCustomArticles)
+    );
   }, [articles]);
 
   const openKnowledgeBase = () => {
@@ -196,6 +229,41 @@ function App() {
         <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>
       )
     );
+
+  const renderStructuredContent = (content, phrase) => {
+    const lines = content.split("\n").map((line) => line.trim());
+    const sections = [];
+    let currentSection = null;
+
+    lines.forEach((line) => {
+      if (!line) return;
+      if (line.endsWith(":")) {
+        currentSection = { heading: line.replace(":", ""), body: [] };
+        sections.push(currentSection);
+        return;
+      }
+      if (!currentSection) {
+        currentSection = { heading: "Описание", body: [] };
+        sections.push(currentSection);
+      }
+      currentSection.body.push(line);
+    });
+
+    return sections.map((section) => (
+      <div key={section.heading} className="article-block">
+        <h4>{section.heading}</h4>
+        {section.body.map((line) => (
+          <p key={`${section.heading}-${line}`}>{renderWithHighlight(line, phrase)}</p>
+        ))}
+      </div>
+    ));
+  };
+
+  const getArticleSummary = (content) =>
+    content
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line && !line.endsWith(":")) || "Описание отсутствует.";
 
   const processTree = useMemo(() => {
     return [
@@ -272,18 +340,9 @@ function App() {
       return;
     }
 
-    const currentDescription = articleToEdit.content.replace(
-      "Пользовательское описание: ",
-      ""
-    );
-    const cleanDescription = currentDescription.replace(
-      ". Система добавила этот функционал в структуру базы знаний понятным языком.",
-      ""
-    );
-
     const updatedDescription = window.prompt(
       "Обновите описание функциональности:",
-      cleanDescription
+      articleToEdit.sourceRaw || articleToEdit.title.replace("Функция: ", "")
     );
 
     if (!updatedDescription || !updatedDescription.trim()) {
@@ -416,7 +475,7 @@ function App() {
             <article className="article-view">
               <p className="article-section">{selectedArticle.section}</p>
               <h3>{renderWithHighlight(selectedArticle.title, query)}</h3>
-              <p>{renderWithHighlight(selectedArticle.content, query)}</p>
+              <div>{renderStructuredContent(selectedArticle.content, query)}</div>
               {searchMessage && <p className="search-message">{searchMessage}</p>}
             </article>
 
@@ -434,7 +493,7 @@ function App() {
                   }}
                 >
                   <h3>{article.title}</h3>
-                  <p>{article.content}</p>
+                  <p>{getArticleSummary(article.content)}</p>
                   {article.section === "Новый функционал" && (
                     <div className="feature-actions">
                       <span
