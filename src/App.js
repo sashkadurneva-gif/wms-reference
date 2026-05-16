@@ -513,19 +513,6 @@ function App() {
     );
   };
 
-  const exportCustomArticles = () => {
-    const customArticles = articles.filter((article) => isCustomArticle(article));
-    const payload = JSON.stringify(customArticles, null, 2);
-    const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "koncrit-custom-articles.json";
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setSearchMessage("Экспортировано: koncrit-custom-articles.json");
-  };
-
   return (
     <div className="page">
       <div className="content">
