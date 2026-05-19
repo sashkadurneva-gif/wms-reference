@@ -1,3 +1,72 @@
+# WMS Reference
+
+## Общая база статей
+
+Пользовательские статьи сохраняются в облачной базе Supabase через Vercel API-функцию. Все пользователи, которые открывают одну и ту же Vercel-ссылку, видят одни и те же созданные статьи.
+
+Текущая ссылка приложения:
+
+```text
+https://wms-reference-git-main-sashkadurneva-gifs-projects.vercel.app/
+```
+
+### Запуск разработки
+
+```bash
+npm start
+```
+
+Команда запускает React-приложение локально: http://localhost:3000.
+
+### Настройка Supabase
+
+1. Создайте бесплатный проект в Supabase.
+2. Откройте SQL Editor.
+3. Выполните SQL из файла `supabase/schema.sql`.
+4. В Vercel добавьте переменные окружения:
+
+```text
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` должен храниться только в Vercel Environment Variables. Не добавляйте его в код и не коммитьте в git.
+
+### Где лежат данные
+
+Статьи лежат в таблице Supabase:
+
+```text
+public.articles
+```
+
+### Как открывают другие пользователи
+
+Другим пользователям ничего устанавливать не нужно. Они открывают Vercel-ссылку в браузере:
+
+```text
+https://wms-reference-git-main-sashkadurneva-gifs-projects.vercel.app/
+```
+
+### Деплой
+
+Vercel связан с GitHub-репозиторием. После коммита и push в ветку `main` Vercel соберет новую версию приложения.
+
+Для проверки сборки локально:
+
+```bash
+npm run build
+```
+
+### Локальные API-функции
+
+Обычный `npm start` запускает только React dev server. Vercel API-функция `api/articles.js` работает на Vercel после деплоя. Для полноценной локальной проверки API можно использовать Vercel CLI и переменные окружения Supabase.
+
+### Важное про доступ
+
+Сейчас все посетители приложения смогут создавать, редактировать и удалять пользовательские статьи. Если нужно ограничить это право, следующим шагом надо добавить авторизацию или пароль на операции записи.
+
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

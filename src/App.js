@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import {
+  createCustomArticle,
+  deleteCustomArticle,
+  fetchCustomArticles,
+  saveCustomArticles,
+  updateCustomArticle
+} from "./articleApi";
 
 const sections = [
   {
@@ -213,6 +220,22 @@ const buildKnowledgeArticleFromInput = (rawInput, section, existingId) => {
   };
 };
 
+const isCustomArticle = (article) => article?.id?.startsWith("custom-");
+
+const normalizeCustomArticles = (articleList) =>
+  articleList
+    .filter(isCustomArticle)
+    .map((article) => {
+      if (article.templateVersion === ARTICLE_TEMPLATE_VERSION && article.sourceRaw) {
+        return article;
+      }
+      const fallbackSource = article.sourceRaw || article.title || article.content;
+      const validSection = sections.some((item) => item.title === article.section)
+        ? article.section
+        : sections[0].title;
+      return buildKnowledgeArticleFromInput(fallbackSource, validSection, article.id);
+    });
+
 function App() {
   const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
   const [articles, setArticles] = useState(() => [...loadCustomArticles(), ...initialArticles]);
@@ -225,6 +248,7 @@ function App() {
   const [newFeatureText, setNewFeatureText] = useState("");
   const [newFeatureSection, setNewFeatureSection] = useState(sections[0].title);
   const [addMessage, setAddMessage] = useState("");
+  const [databaseMessage, setDatabaseMessage] = useState("");
   const [isDiagramView, setIsDiagramView] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editArticleId, setEditArticleId] = useState("");
@@ -234,8 +258,6 @@ function App() {
   const [draggedArticleId, setDraggedArticleId] = useState("");
   const [dropTargetArticleId, setDropTargetArticleId] = useState("");
   const [favoriteArticleIds, setFavoriteArticleIds] = useState(() => loadFavoriteArticleIds());
-
-  const isCustomArticle = (article) => article.id.startsWith("custom-");
 
   const selectedArticle = useMemo(
     () => articles.find((article) => article.id === selectedArticleId) ?? articles[0],
@@ -271,22 +293,44 @@ function App() {
   }, [articles, selectedArticleId]);
 
   useEffect(() => {
-    const customArticles = articles.filter((article) => isCustomArticle(article));
-    const normalizedCustomArticles = customArticles.map((article) => {
-      if (article.templateVersion === ARTICLE_TEMPLATE_VERSION && article.sourceRaw) {
-        return article;
+    let isMounted = true;
+
+    const loadArticlesFromDatabase = async () => {
+      const localArticles = normalizeCustomArticles(loadCustomArticles());
+
+      try {
+        const databaseArticles = normalizeCustomArticles(await fetchCustomArticles());
+
+        if (!isMounted) return;
+
+        if (databaseArticles.length === 0 && localArticles.length > 0) {
+          const migratedArticles = normalizeCustomArticles(await saveCustomArticles(localArticles));
+          setArticles([...migratedArticles, ...initialArticles]);
+          setSelectedArticleId(migratedArticles[0]?.id ?? initialArticles[0].id);
+          setDatabaseMessage("Локальные статьи перенесены в базу.");
+          return;
+        }
+
+        setArticles([...databaseArticles, ...initialArticles]);
+        setSelectedArticleId(databaseArticles[0]?.id ?? initialArticles[0].id);
+        setDatabaseMessage("");
+      } catch (error) {
+        if (!isMounted) return;
+
+        setArticles([...localArticles, ...initialArticles]);
+        setSelectedArticleId(localArticles[0]?.id ?? initialArticles[0].id);
+        setDatabaseMessage(
+          "База статей недоступна. Проверьте настройки Supabase в Vercel."
+        );
       }
-      const fallbackSource = article.sourceRaw || article.title || article.content;
-      const validSection = sections.some((item) => item.title === article.section)
-        ? article.section
-        : sections[0].title;
-      return buildKnowledgeArticleFromInput(fallbackSource, validSection, article.id);
-    });
-    window.localStorage.setItem(
-      CUSTOM_ARTICLES_STORAGE_KEY,
-      JSON.stringify(normalizedCustomArticles)
-    );
-  }, [articles]);
+    };
+
+    loadArticlesFromDatabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteArticleIds));
@@ -407,7 +451,7 @@ function App() {
     setSearchMessage(`Открыта статья: ${match.title}`);
   };
 
-  const handleAddFeature = (event) => {
+  const handleAddFeature = async (event) => {
     event.preventDefault();
     const rawDescription = newFeatureText.trim();
 
@@ -417,24 +461,37 @@ function App() {
     }
 
     const newArticle = buildKnowledgeArticleFromInput(rawDescription, newFeatureSection);
+    setAddMessage("Сохраняем статью в базу...");
 
-    setArticles((prev) => [newArticle, ...prev]);
-    setSelectedArticleId(newArticle.id);
-    setIsKnowledgeBaseOpen(true);
-    setSearchMessage(`Добавлена статья: ${newArticle.title}`);
-    setAddMessage("Описание преобразовано в формат справочника и добавлено в базу знаний.");
-    setNewFeatureText("");
-    setNewFeatureSection(sections[0].title);
+    try {
+      const savedArticle = await createCustomArticle(newArticle);
+      setArticles((prev) => [savedArticle, ...prev.filter((article) => article.id !== savedArticle.id)]);
+      setSelectedArticleId(savedArticle.id);
+      setIsKnowledgeBaseOpen(true);
+      setSearchMessage(`Добавлена статья: ${savedArticle.title}`);
+      setAddMessage("Описание преобразовано и сохранено в базе знаний.");
+      setDatabaseMessage("");
+      setNewFeatureText("");
+      setNewFeatureSection(sections[0].title);
+    } catch (error) {
+      setAddMessage(`Не удалось сохранить статью в базу: ${error.message}`);
+    }
   };
 
-  const handleDeleteFeature = (articleId) => {
+  const handleDeleteFeature = async (articleId) => {
     const articleToDelete = articles.find((article) => article.id === articleId);
     if (!articleToDelete || !isCustomArticle(articleToDelete)) {
       return;
     }
 
-    setArticles((prev) => prev.filter((article) => article.id !== articleId));
-    setSearchMessage(`Функциональность удалена: ${articleToDelete.title}`);
+    try {
+      await deleteCustomArticle(articleId);
+      setArticles((prev) => prev.filter((article) => article.id !== articleId));
+      setSearchMessage(`Функциональность удалена: ${articleToDelete.title}`);
+      setDatabaseMessage("");
+    } catch (error) {
+      setSearchMessage(`Не удалось удалить статью из базы: ${error.message}`);
+    }
   };
 
   const handleEditFeature = (articleId) => {
@@ -448,7 +505,7 @@ function App() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveEditFeature = (event) => {
+  const handleSaveEditFeature = async (event) => {
     event.preventDefault();
     const normalized = editFeatureText.trim();
     if (!normalized) {
@@ -461,21 +518,28 @@ function App() {
       editFeatureSection,
       editArticleId
     );
-    setArticles((prev) =>
-      prev.map((article) =>
-        article.id === editArticleId ? updatedArticle : article
-      )
-    );
-    setSelectedArticleId(updatedArticle.id);
-    setIsEditModalOpen(false);
-    setSearchMessage("Функциональность обновлена и переформулирована в формат справочника.");
+
+    try {
+      const savedArticle = await updateCustomArticle(editArticleId, updatedArticle);
+      setArticles((prev) =>
+        prev.map((article) =>
+          article.id === editArticleId ? savedArticle : article
+        )
+      );
+      setSelectedArticleId(savedArticle.id);
+      setIsEditModalOpen(false);
+      setSearchMessage("Функциональность обновлена и сохранена в базе.");
+      setDatabaseMessage("");
+    } catch (error) {
+      setSearchMessage(`Не удалось сохранить изменения в базе: ${error.message}`);
+    }
   };
 
   const handleCustomDragStart = (articleId) => {
     setDraggedArticleId(articleId);
   };
 
-  const handleCustomDrop = (targetArticleId) => {
+  const handleCustomDrop = async (targetArticleId) => {
     if (!draggedArticleId || draggedArticleId === targetArticleId) return;
 
     const draggedArticle = articles.find((item) => item.id === draggedArticleId);
@@ -493,16 +557,23 @@ function App() {
       return;
     }
 
-    setArticles((prev) => {
-      const dragIndex = prev.findIndex((item) => item.id === draggedArticleId);
-      const targetIndex = prev.findIndex((item) => item.id === targetArticleId);
-      if (dragIndex < 0 || targetIndex < 0) return prev;
+    const dragIndex = articles.findIndex((item) => item.id === draggedArticleId);
+    const targetIndex = articles.findIndex((item) => item.id === targetArticleId);
+    if (dragIndex < 0 || targetIndex < 0) return;
 
-      const updated = [...prev];
-      const [moved] = updated.splice(dragIndex, 1);
-      updated.splice(targetIndex, 0, moved);
-      return updated;
-    });
+    const updated = [...articles];
+    const [moved] = updated.splice(dragIndex, 1);
+    updated.splice(targetIndex, 0, moved);
+    setArticles(updated);
+
+    try {
+      await saveCustomArticles(normalizeCustomArticles(updated));
+      setDatabaseMessage("");
+    } catch (error) {
+      setArticles(articles);
+      setSearchMessage(`Не удалось сохранить порядок статей: ${error.message}`);
+    }
+
     setDraggedArticleId("");
     setDropTargetArticleId("");
   };
@@ -568,6 +639,7 @@ function App() {
             </button>
           </form>
           {addMessage && <p className="add-message">{addMessage}</p>}
+          {databaseMessage && <p className="add-message">{databaseMessage}</p>}
         </header>
 
         <div className="cards">
