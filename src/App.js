@@ -236,6 +236,16 @@ const normalizeCustomArticles = (articleList) =>
       return buildKnowledgeArticleFromInput(fallbackSource, validSection, article.id);
     });
 
+const getArticleHaystack = (article) =>
+  [
+    article.title,
+    article.section,
+    article.content,
+    ...article.keywords
+  ]
+    .join(" ")
+    .toLowerCase();
+
 function App() {
   const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
   const [articles, setArticles] = useState(() => [...loadCustomArticles(), ...initialArticles]);
@@ -249,6 +259,9 @@ function App() {
   const [newFeatureSection, setNewFeatureSection] = useState(sections[0].title);
   const [addMessage, setAddMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
+  const [isArticlesLoading, setIsArticlesLoading] = useState(true);
+  const [isAddPending, setIsAddPending] = useState(false);
+  const [isEditPending, setIsEditPending] = useState(false);
   const [isDiagramView, setIsDiagramView] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editArticleId, setEditArticleId] = useState("");
@@ -257,6 +270,8 @@ function App() {
   const [activeSectionFilter, setActiveSectionFilter] = useState("Все");
   const [draggedArticleId, setDraggedArticleId] = useState("");
   const [dropTargetArticleId, setDropTargetArticleId] = useState("");
+  const [pendingArticleId, setPendingArticleId] = useState("");
+  const [articleToDelete, setArticleToDelete] = useState(null);
   const [favoriteArticleIds, setFavoriteArticleIds] = useState(() => loadFavoriteArticleIds());
 
   const selectedArticle = useMemo(
@@ -271,19 +286,35 @@ function App() {
     () => articles.filter((article) => favoriteArticleIds.includes(article.id)).length,
     [articles, favoriteArticleIds]
   );
+  const sectionStats = useMemo(
+    () =>
+      sections.map((section) => ({
+        ...section,
+        count: articles.filter((article) => article.section === section.title).length
+      })),
+    [articles]
+  );
 
   useEffect(() => {
     if (!isKnowledgeBaseOpen) return undefined;
 
     const handleEscape = (event) => {
       if (event.key === "Escape") {
+        if (articleToDelete && !pendingArticleId) {
+          setArticleToDelete(null);
+          return;
+        }
+        if (isEditModalOpen && !isEditPending) {
+          setIsEditModalOpen(false);
+          return;
+        }
         setIsKnowledgeBaseOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isKnowledgeBaseOpen]);
+  }, [articleToDelete, isEditModalOpen, isEditPending, isKnowledgeBaseOpen, pendingArticleId]);
 
   useEffect(() => {
     const hasSelectedArticle = articles.some((article) => article.id === selectedArticleId);
@@ -296,6 +327,7 @@ function App() {
     let isMounted = true;
 
     const loadArticlesFromDatabase = async () => {
+      setIsArticlesLoading(true);
       const localArticles = normalizeCustomArticles(loadCustomArticles());
 
       try {
@@ -322,6 +354,10 @@ function App() {
         setDatabaseMessage(
           "База статей недоступна. Проверьте настройки Supabase в Vercel."
         );
+      } finally {
+        if (isMounted) {
+          setIsArticlesLoading(false);
+        }
       }
     };
 
@@ -339,6 +375,22 @@ function App() {
   const openKnowledgeBase = () => {
     setSearchMessage("");
     setIsKnowledgeBaseOpen(true);
+  };
+
+  const handleRefreshArticles = async () => {
+    setIsArticlesLoading(true);
+    setDatabaseMessage("");
+
+    try {
+      const databaseArticles = normalizeCustomArticles(await fetchCustomArticles());
+      setArticles([...databaseArticles, ...initialArticles]);
+      setSelectedArticleId(databaseArticles[0]?.id ?? initialArticles[0].id);
+      setDatabaseMessage("Статьи обновлены из базы.");
+    } catch (error) {
+      setDatabaseMessage(`Не удалось обновить базу: ${error.message}`);
+    } finally {
+      setIsArticlesLoading(false);
+    }
   };
 
   const splitWithHighlight = (text, phrase) => {
@@ -410,14 +462,23 @@ function App() {
   }, [articles]);
 
   const visibleArticles = useMemo(() => {
-    if (activeSectionFilter === "Все") {
-      return articles;
-    }
+    let filteredArticles = articles;
+
     if (activeSectionFilter === "Избранное") {
-      return articles.filter((article) => favoriteArticleIds.includes(article.id));
+      filteredArticles = filteredArticles.filter((article) => favoriteArticleIds.includes(article.id));
+    } else if (activeSectionFilter !== "Все") {
+      filteredArticles = filteredArticles.filter((article) => article.section === activeSectionFilter);
     }
-    return articles.filter((article) => article.section === activeSectionFilter);
-  }, [activeSectionFilter, articles, favoriteArticleIds]);
+
+    const normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery) {
+      filteredArticles = filteredArticles.filter((article) =>
+        getArticleHaystack(article).includes(normalizedQuery)
+      );
+    }
+
+    return filteredArticles;
+  }, [activeSectionFilter, articles, favoriteArticleIds, query]);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -429,17 +490,7 @@ function App() {
       return;
     }
 
-    const match = articles.find((article) => {
-      const haystack = [
-        article.title,
-        article.section,
-        article.content,
-        ...article.keywords
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(normalizedQuery);
-    });
+    const match = articles.find((article) => getArticleHaystack(article).includes(normalizedQuery));
 
     setIsKnowledgeBaseOpen(true);
     if (!match) {
@@ -462,10 +513,14 @@ function App() {
 
     const newArticle = buildKnowledgeArticleFromInput(rawDescription, newFeatureSection);
     setAddMessage("Сохраняем статью в базу...");
+    setIsAddPending(true);
 
     try {
       const savedArticle = await createCustomArticle(newArticle);
-      setArticles((prev) => [savedArticle, ...prev.filter((article) => article.id !== savedArticle.id)]);
+      setArticles((prev) => [
+        savedArticle,
+        ...prev.filter((article) => article.id !== savedArticle.id)
+      ]);
       setSelectedArticleId(savedArticle.id);
       setIsKnowledgeBaseOpen(true);
       setSearchMessage(`Добавлена статья: ${savedArticle.title}`);
@@ -475,22 +530,39 @@ function App() {
       setNewFeatureSection(sections[0].title);
     } catch (error) {
       setAddMessage(`Не удалось сохранить статью в базу: ${error.message}`);
+    } finally {
+      setIsAddPending(false);
     }
   };
 
-  const handleDeleteFeature = async (articleId) => {
+  const handleDeleteFeature = (articleId) => {
     const articleToDelete = articles.find((article) => article.id === articleId);
     if (!articleToDelete || !isCustomArticle(articleToDelete)) {
       return;
     }
 
+    setArticleToDelete(articleToDelete);
+  };
+
+  const handleConfirmDeleteFeature = async () => {
+    if (!articleToDelete) {
+      return;
+    }
+
+    const articleId = articleToDelete.id;
+    setPendingArticleId(articleId);
+
     try {
       await deleteCustomArticle(articleId);
       setArticles((prev) => prev.filter((article) => article.id !== articleId));
-      setSearchMessage(`Функциональность удалена: ${articleToDelete.title}`);
+      setFavoriteArticleIds((prev) => prev.filter((id) => id !== articleId));
+      setSearchMessage(`Статья удалена: ${articleToDelete.title}`);
       setDatabaseMessage("");
+      setArticleToDelete(null);
     } catch (error) {
       setSearchMessage(`Не удалось удалить статью из базы: ${error.message}`);
+    } finally {
+      setPendingArticleId("");
     }
   };
 
@@ -518,6 +590,7 @@ function App() {
       editFeatureSection,
       editArticleId
     );
+    setIsEditPending(true);
 
     try {
       const savedArticle = await updateCustomArticle(editArticleId, updatedArticle);
@@ -532,6 +605,8 @@ function App() {
       setDatabaseMessage("");
     } catch (error) {
       setSearchMessage(`Не удалось сохранить изменения в базе: ${error.message}`);
+    } finally {
+      setIsEditPending(false);
     }
   };
 
@@ -565,6 +640,7 @@ function App() {
     const [moved] = updated.splice(dragIndex, 1);
     updated.splice(targetIndex, 0, moved);
     setArticles(updated);
+    setPendingArticleId(draggedArticleId);
 
     try {
       await saveCustomArticles(normalizeCustomArticles(updated));
@@ -572,6 +648,8 @@ function App() {
     } catch (error) {
       setArticles(articles);
       setSearchMessage(`Не удалось сохранить порядок статей: ${error.message}`);
+    } finally {
+      setPendingArticleId("");
     }
 
     setDraggedArticleId("");
@@ -608,6 +686,18 @@ function App() {
               <button className="search-button" type="submit">
                 Поиск
               </button>
+              {query && (
+                <button
+                  className="search-clear-button"
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    setSearchMessage("");
+                  }}
+                >
+                  Сброс
+                </button>
+              )}
             </form>
           </div>
           <form className="add-feature-form" onSubmit={handleAddFeature}>
@@ -620,6 +710,7 @@ function App() {
                 className="feature-section-select"
                 value={newFeatureSection}
                 onChange={(event) => setNewFeatureSection(event.target.value)}
+                disabled={isAddPending}
               >
                 {sections.map((item) => (
                   <option key={`add-${item.title}`} value={item.title}>
@@ -633,19 +724,24 @@ function App() {
               value={newFeatureText}
               onChange={(event) => setNewFeatureText(event.target.value)}
               placeholder="Добавить функциональность: опишите новую возможность системы простыми словами"
+              disabled={isAddPending}
             />
-            <button className="add-feature-button" type="submit">
-              Добавить функциональность
+            <button className="add-feature-button" type="submit" disabled={isAddPending}>
+              {isAddPending ? "Сохраняем..." : "Добавить функциональность"}
             </button>
           </form>
           {addMessage && <p className="add-message">{addMessage}</p>}
+          {isArticlesLoading && <p className="add-message">Загружаем статьи из базы...</p>}
           {databaseMessage && <p className="add-message">{databaseMessage}</p>}
         </header>
 
         <div className="cards">
-          {sections.map((item) => (
+          {sectionStats.map((item) => (
             <section key={item.title} className="card">
-              <h3>{item.title}</h3>
+              <div className="card-title-row">
+                <h3>{item.title}</h3>
+                <span>{item.count}</span>
+              </div>
               <p>{item.description}</p>
             </section>
           ))}
@@ -728,14 +824,36 @@ function App() {
                 <span>Пользовательских: {customArticlesCount}</span>
                 <span>Избранных: {favoritesCount}</span>
               </div>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => setIsKnowledgeBaseOpen(false)}
-              >
-                Закрыть
-              </button>
+              <div className="knowledge-tools">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={handleRefreshArticles}
+                  disabled={isArticlesLoading}
+                >
+                  {isArticlesLoading ? "Обновляем..." : "Обновить"}
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setIsKnowledgeBaseOpen(false)}
+                >
+                  Закрыть
+                </button>
+              </div>
             </div>
+            {(isArticlesLoading || databaseMessage) && (
+              <p
+                className={`sync-message ${
+                  databaseMessage.startsWith("Не удалось") ||
+                  databaseMessage.includes("недоступна")
+                    ? "sync-message--error"
+                    : ""
+                }`}
+              >
+                {isArticlesLoading ? "Загружаем статьи из Supabase..." : databaseMessage}
+              </p>
+            )}
 
             <div className="section-filters">
               <button
@@ -778,6 +896,12 @@ function App() {
             </article>
 
             <div className="knowledge-grid">
+              {visibleArticles.length === 0 && (
+                <div className="empty-state">
+                  <h3>Статьи не найдены</h3>
+                  <p>Измените запрос или выберите другой раздел.</p>
+                </div>
+              )}
               {visibleArticles.map((article) => (
                 <button
                   key={article.id}
@@ -785,7 +909,8 @@ function App() {
                     selectedArticle.id === article.id ? "knowledge-card--active" : ""
                   } ${dropTargetArticleId === article.id ? "knowledge-card--drop-target" : ""}`}
                   type="button"
-                  draggable={isCustomArticle(article)}
+                  disabled={pendingArticleId === article.id}
+                  draggable={isCustomArticle(article) && pendingArticleId !== article.id}
                   onDragStart={() => handleCustomDragStart(article.id)}
                   onDragOver={(event) => {
                     if (isCustomArticle(article)) {
@@ -839,13 +964,17 @@ function App() {
                         tabIndex={0}
                         onClick={(event) => {
                           event.stopPropagation();
-                          handleEditFeature(article.id);
+                          if (pendingArticleId !== article.id) {
+                            handleEditFeature(article.id);
+                          }
                         }}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
                             event.stopPropagation();
-                            handleEditFeature(article.id);
+                            if (pendingArticleId !== article.id) {
+                              handleEditFeature(article.id);
+                            }
                           }
                         }}
                       >
@@ -857,17 +986,21 @@ function App() {
                         tabIndex={0}
                         onClick={(event) => {
                           event.stopPropagation();
-                          handleDeleteFeature(article.id);
+                          if (pendingArticleId !== article.id) {
+                            handleDeleteFeature(article.id);
+                          }
                         }}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
                             event.stopPropagation();
-                            handleDeleteFeature(article.id);
+                            if (pendingArticleId !== article.id) {
+                              handleDeleteFeature(article.id);
+                            }
                           }
                         }}
                       >
-                        Удалить
+                        {pendingArticleId === article.id ? "Удаляем..." : "Удалить"}
                       </span>
                     </div>
                   )}
@@ -896,6 +1029,7 @@ function App() {
                 className="feature-section-select"
                 value={editFeatureSection}
                 onChange={(event) => setEditFeatureSection(event.target.value)}
+                disabled={isEditPending}
               >
                 {sections.map((item) => (
                   <option key={`edit-${item.title}`} value={item.title}>
@@ -907,20 +1041,61 @@ function App() {
                 className="edit-textarea"
                 value={editFeatureText}
                 onChange={(event) => setEditFeatureText(event.target.value)}
+                disabled={isEditPending}
               />
               <div className="edit-actions">
-                <button className="add-feature-button" type="submit">
-                  Сохранить
+                <button className="add-feature-button" type="submit" disabled={isEditPending}>
+                  {isEditPending ? "Сохраняем..." : "Сохранить"}
                 </button>
                 <button
                   className="secondary-button"
                   type="button"
+                  disabled={isEditPending}
                   onClick={() => setIsEditModalOpen(false)}
                 >
                   Отмена
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {articleToDelete && (
+        <div
+          className="confirm-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !pendingArticleId) {
+              setArticleToDelete(null);
+            }
+          }}
+        >
+          <div className="confirm-content">
+            <p className="article-section">Удаление статьи</p>
+            <h2>{articleToDelete.title}</h2>
+            <p>
+              Статья будет удалена из общей базы Supabase и пропадет у всех пользователей.
+            </p>
+            <div className="confirm-actions">
+              <button
+                className="danger-button"
+                type="button"
+                onClick={handleConfirmDeleteFeature}
+                disabled={pendingArticleId === articleToDelete.id}
+              >
+                {pendingArticleId === articleToDelete.id ? "Удаляем..." : "Удалить статью"}
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setArticleToDelete(null)}
+                disabled={pendingArticleId === articleToDelete.id}
+              >
+                Отмена
+              </button>
+            </div>
           </div>
         </div>
       )}
