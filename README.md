@@ -36,7 +36,7 @@ OPENAI_API_KEY=...
 `OPENAI_API_KEY` нужен для кнопки `Улучшить с ИИ` при добавлении статьи. Ключ тоже хранится только в Vercel Environment Variables. Опционально можно указать модель:
 
 ```text
-OPENAI_MODEL=gpt-5.4-mini
+OPENAI_MODEL=gpt-4.1-mini
 ```
 
 ### Где лежат данные

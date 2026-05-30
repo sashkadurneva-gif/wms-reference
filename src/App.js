@@ -101,10 +101,7 @@ const initialArticles = [
 
 const CUSTOM_ARTICLES_STORAGE_KEY = "koncrit.customArticles";
 const FAVORITES_STORAGE_KEY = "koncrit.favoriteArticleIds";
-const ARTICLE_TEMPLATE_VERSION = 2;
-
-const TEMPLATE_RESULT_TEXT =
-  "Пользователь получает понятный и повторяемый сценарий работы в системе.";
+const ARTICLE_TEMPLATE_VERSION = 3;
 
 const loadCustomArticles = () => {
   try {
@@ -170,6 +167,42 @@ const toProcessSentence = (text) => {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 };
 
+const cleanupDeveloperWording = (text) =>
+  text
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/^(нужно|надо|необходимо|требуется)\s+/i, "")
+    .replace(/^(добавить|реализовать|сделать|разработать|создать)\s+/i, "")
+    .replace(/\bдолжн(а|о|ы)?\s+быть\s+/gi, "")
+    .replace(/\bдолжн(а|о|ы)?\s+/gi, "")
+    .replace(/\bбудет\s+/gi, "")
+    .replace(/\bследует\s+/gi, "")
+    .trim();
+
+const ensureSentenceEnd = (text) => {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+};
+
+const trimTitle = (text) => {
+  const normalized = cleanupDeveloperWording(text)
+    .replace(/^функци(я|и):\s*/i, "")
+    .replace(/[.?!:;]+$/g, "")
+    .trim();
+
+  if (normalized.length <= 88) {
+    return toProcessSentence(normalized);
+  }
+
+  const compactTitle = normalized
+    .slice(0, 88)
+    .replace(/\s+\S*$/u, "")
+    .trim();
+
+  return toProcessSentence(compactTitle || normalized.slice(0, 88).trim());
+};
+
 const buildKnowledgeArticleFromInput = (rawInput, section, existingId) => {
   const normalizedInput = rawInput.trim().replace(/\s+/g, " ");
   const clauses = normalizedInput
@@ -178,14 +211,13 @@ const buildKnowledgeArticleFromInput = (rawInput, section, existingId) => {
     .filter(Boolean);
 
   const firstClause = clauses[0] || normalizedInput;
-  const titleBase = toProcessSentence(firstClause);
-  const title = `Функция: ${titleBase.slice(0, 52)}${titleBase.length > 52 ? "..." : ""}`;
-
-  const steps = clauses.slice(0, 3).map((clause) => toProcessSentence(clause));
-  const fallbackStep = "Определите сценарий использования и ожидаемый результат.";
-  while (steps.length < 3) {
-    steps.push(fallbackStep);
-  }
+  const title = trimTitle(firstClause);
+  const userFacingSentences = clauses
+    .map(cleanupDeveloperWording)
+    .filter(Boolean)
+    .map(toProcessSentence);
+  const description = ensureSentenceEnd(userFacingSentences[0] || title);
+  const details = userFacingSentences.slice(1, 4);
 
   const keywords = normalizedInput
     .toLowerCase()
@@ -194,21 +226,17 @@ const buildKnowledgeArticleFromInput = (rawInput, section, existingId) => {
     .filter((word) => word.length > 3 && !STOP_WORDS.has(word))
     .slice(0, 8);
 
-  const content = [
-    "Цель:",
-    `Обеспечить выполнение функции: ${titleBase}.`,
-    "",
-    "Когда использовать:",
-    `Когда требуется сценарий: ${titleBase.toLowerCase()}.`,
-    "",
-    "Пошагово:",
-    `1. ${steps[0]}.`,
-    `2. ${steps[1]}.`,
-    `3. ${steps[2]}.`,
-    "",
-    "Результат:",
-    TEMPLATE_RESULT_TEXT
-  ].join("\n");
+  const contentParts = [
+    "Описание:",
+    description
+  ];
+
+  if (details.length > 0) {
+    contentParts.push("", "Как работает в системе:");
+    contentParts.push(...details.map(ensureSentenceEnd));
+  }
+
+  const content = contentParts.join("\n");
 
   return {
     id: existingId ?? `custom-${Date.now()}`,
@@ -236,6 +264,17 @@ const normalizeCustomArticles = (articleList) =>
         : sections[0].title;
       return buildKnowledgeArticleFromInput(fallbackSource, validSection, article.id);
     });
+
+const needsArticleTemplateMigration = (articleList) =>
+  articleList.some(
+    (article) =>
+      isCustomArticle(article) &&
+      (article.templateVersion !== ARTICLE_TEMPLATE_VERSION ||
+        article.title?.startsWith("Функция:") ||
+        article.content?.includes("Обеспечить выполнение функции") ||
+        article.content?.includes("Когда использовать:") ||
+        article.content?.includes("Пошагово:"))
+  );
 
 const getArticleHaystack = (article) =>
   [
@@ -333,7 +372,8 @@ function App() {
       const localArticles = normalizeCustomArticles(loadCustomArticles());
 
       try {
-        const databaseArticles = normalizeCustomArticles(await fetchCustomArticles());
+        const rawDatabaseArticles = await fetchCustomArticles();
+        const databaseArticles = normalizeCustomArticles(rawDatabaseArticles);
 
         if (!isMounted) return;
 
@@ -343,6 +383,10 @@ function App() {
           setSelectedArticleId(migratedArticles[0]?.id ?? initialArticles[0].id);
           setDatabaseMessage("Локальные статьи перенесены в базу.");
           return;
+        }
+
+        if (needsArticleTemplateMigration(rawDatabaseArticles) && databaseArticles.length > 0) {
+          await saveCustomArticles(databaseArticles);
         }
 
         setArticles([...databaseArticles, ...initialArticles]);
@@ -398,7 +442,11 @@ function App() {
     setDatabaseMessage("");
 
     try {
-      const databaseArticles = normalizeCustomArticles(await fetchCustomArticles());
+      const rawDatabaseArticles = await fetchCustomArticles();
+      const databaseArticles = normalizeCustomArticles(rawDatabaseArticles);
+      if (needsArticleTemplateMigration(rawDatabaseArticles) && databaseArticles.length > 0) {
+        await saveCustomArticles(databaseArticles);
+      }
       setArticles([...databaseArticles, ...initialArticles]);
       setSelectedArticleId(databaseArticles[0]?.id ?? initialArticles[0].id);
       setDatabaseMessage("Статьи обновлены из базы.");
@@ -613,7 +661,7 @@ function App() {
       return;
     }
     setEditArticleId(articleToEdit.id);
-    setEditFeatureText(articleToEdit.sourceRaw || articleToEdit.title.replace("Функция: ", ""));
+    setEditFeatureText(articleToEdit.sourceRaw || articleToEdit.title);
     setEditFeatureSection(articleToEdit.section);
     setIsEditModalOpen(true);
   };
