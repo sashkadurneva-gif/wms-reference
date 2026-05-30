@@ -178,6 +178,27 @@ input:disabled {
   cursor: pointer;
 }
 
+.feature-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.ai-button {
+  border: 1px solid #20634f;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #ecf7f2;
+  color: #20634f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ai-button:hover {
+  background: #dcefe8;
+}
+
 .add-feature-button:hover {
   background: #121239;
 }
@@ -240,15 +261,41 @@ input:disabled {
   padding: 16px;
 }
 
-.process-tree h2 {
-  margin: 0 0 12px;
+.process-tree-header {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.process-tree-header h2 {
+  margin: 0;
   color: #32386d;
   font-size: 22px;
 }
 
-.process-tree-title {
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid #bdbdbd;
+  border-radius: 10px;
+  padding: 3px;
+  background: #f5f5f5;
+}
+
+.view-toggle-btn {
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 12px;
+  background: transparent;
+  color: #32386d;
+  font-weight: 700;
   cursor: pointer;
-  user-select: none;
+}
+
+.view-toggle-btn--active {
+  color: #ffffff;
+  background: #32386d;
 }
 
 .process-list {
@@ -282,75 +329,81 @@ input:disabled {
   border-color: #32386d;
 }
 
-.process-diagram {
+.process-diagram-map {
   display: grid;
-  gap: 16px;
-}
-
-.tree-diagram ul {
-  list-style: none;
-  margin: 0;
-  padding-left: 24px;
-  position: relative;
-}
-
-.tree-diagram ul ul::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 12px;
-  left: 10px;
-  border-left: 1px solid #bdbdbd;
-}
-
-.tree-diagram li {
-  position: relative;
-  margin: 8px 0;
-}
-
-.tree-diagram li::before {
-  content: "";
-  position: absolute;
-  top: 12px;
-  left: -14px;
-  width: 14px;
-  border-top: 1px solid #bdbdbd;
+  gap: 14px;
 }
 
 .diagram-root {
+  justify-self: center;
   border: 1px solid #32386d;
   border-radius: 10px;
   background: #32386d;
   color: #ffffff;
-  padding: 10px 12px;
-  font-weight: 700;
-  width: fit-content;
+  padding: 10px 14px;
+  font-weight: 800;
 }
 
-.diagram-branches {
+.diagram-lanes {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
-.diagram-branch {
+.diagram-lane {
+  position: relative;
   border: 1px solid #bdbdbd;
   border-radius: 12px;
-  background: #ffffff;
-  padding: 12px;
+  padding: 14px;
+  background: #f8fafc;
 }
 
-.diagram-node {
+.diagram-lane::before {
+  content: "";
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  height: 14px;
+  border-left: 1px solid #bdbdbd;
+}
+
+.diagram-lane-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.diagram-lane-heading h3 {
+  margin: 0;
+  color: #32386d;
+  font-size: 16px;
+}
+
+.diagram-lane-heading span {
+  border: 1px solid #b6d8cb;
+  border-radius: 999px;
+  padding: 2px 9px;
+  color: #20634f;
+  font-size: 12px;
   font-weight: 700;
-  color: #32386d;
+  background: #ecf7f2;
 }
 
-.diagram-arrow {
-  color: #32386d;
-  margin: 6px 0;
+.diagram-lane ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
 }
 
-.diagram-leaf {
+.diagram-lane li {
+  border: 1px solid #d8dce6;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
   color: #121239;
   font-size: 14px;
 }
@@ -361,16 +414,21 @@ input:disabled {
   z-index: 10;
   background: rgba(18, 18, 57, 0.32);
   padding: 28px 20px;
-  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  overflow: hidden;
 }
 
 .knowledge-content {
+  width: min(1100px, 100%);
+  max-height: calc(100vh - 56px);
   max-width: 1100px;
   margin: 0 auto;
   background: #f5f5f5;
   border-radius: 14px;
   padding: 20px;
   border: 1px solid #bdbdbd;
+  overflow-y: auto;
 }
 
 .knowledge-header {
@@ -717,10 +775,28 @@ input:disabled {
     flex: 1;
   }
 
+  .feature-form-actions {
+    flex-direction: column;
+  }
+
+  .ai-button,
   .add-feature-button,
   .feature-section-select,
   .feature-form-top {
     width: 100%;
+  }
+
+  .process-tree-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .view-toggle {
+    width: 100%;
+  }
+
+  .view-toggle-btn {
+    flex: 1;
   }
 
   .feature-form-top {

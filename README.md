@@ -28,9 +28,16 @@ npm start
 ```text
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
+OPENAI_API_KEY=...
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` должен храниться только в Vercel Environment Variables. Не добавляйте его в код и не коммитьте в git.
+
+`OPENAI_API_KEY` нужен для кнопки `Улучшить с ИИ` при добавлении статьи. Ключ тоже хранится только в Vercel Environment Variables. Опционально можно указать модель:
+
+```text
+OPENAI_MODEL=gpt-5.4-mini
+```
 
 ### Где лежат данные
 
@@ -60,7 +67,7 @@ npm run build
 
 ### Локальные API-функции
 
-Обычный `npm start` запускает только React dev server. Vercel API-функция `api/articles.js` работает на Vercel после деплоя. Для полноценной локальной проверки API можно использовать Vercel CLI и переменные окружения Supabase.
+Обычный `npm start` запускает только React dev server. Vercel API-функции `api/articles.js` и `api/polish-article.js` работают на Vercel после деплоя. Для полноценной локальной проверки API можно использовать Vercel CLI и переменные окружения Supabase/OpenAI.
 
 ### Важное про доступ
 

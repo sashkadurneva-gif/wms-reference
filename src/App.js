@@ -4,6 +4,7 @@ import {
   createCustomArticle,
   deleteCustomArticle,
   fetchCustomArticles,
+  polishArticleText,
   saveCustomArticles,
   updateCustomArticle
 } from "./articleApi";
@@ -261,6 +262,7 @@ function App() {
   const [databaseMessage, setDatabaseMessage] = useState("");
   const [isArticlesLoading, setIsArticlesLoading] = useState(true);
   const [isAddPending, setIsAddPending] = useState(false);
+  const [isAiPending, setIsAiPending] = useState(false);
   const [isEditPending, setIsEditPending] = useState(false);
   const [isDiagramView, setIsDiagramView] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -371,6 +373,20 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteArticleIds));
   }, [favoriteArticleIds]);
+
+  useEffect(() => {
+    const shouldLockScroll = isKnowledgeBaseOpen || isEditModalOpen || Boolean(articleToDelete);
+    if (!shouldLockScroll) {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [articleToDelete, isEditModalOpen, isKnowledgeBaseOpen]);
 
   const openKnowledgeBase = () => {
     setSearchMessage("");
@@ -500,6 +516,31 @@ function App() {
 
     setSelectedArticleId(match.id);
     setSearchMessage(`Открыта статья: ${match.title}`);
+  };
+
+  const handlePolishFeatureText = async () => {
+    const rawDescription = newFeatureText.trim();
+
+    if (!rawDescription) {
+      setAddMessage("Добавьте черновик описания, чтобы улучшить его с ИИ.");
+      return;
+    }
+
+    setIsAiPending(true);
+    setAddMessage("ИИ редактирует описание...");
+
+    try {
+      const result = await polishArticleText({
+        text: rawDescription,
+        section: newFeatureSection
+      });
+      setNewFeatureText(result.text);
+      setAddMessage("Описание улучшено. Проверьте текст и добавьте статью в базу.");
+    } catch (error) {
+      setAddMessage(`ИИ-редактор недоступен: ${error.message}`);
+    } finally {
+      setIsAiPending(false);
+    }
   };
 
   const handleAddFeature = async (event) => {
@@ -710,7 +751,7 @@ function App() {
                 className="feature-section-select"
                 value={newFeatureSection}
                 onChange={(event) => setNewFeatureSection(event.target.value)}
-                disabled={isAddPending}
+                disabled={isAddPending || isAiPending}
               >
                 {sections.map((item) => (
                   <option key={`add-${item.title}`} value={item.title}>
@@ -724,11 +765,25 @@ function App() {
               value={newFeatureText}
               onChange={(event) => setNewFeatureText(event.target.value)}
               placeholder="Добавить функциональность: опишите новую возможность системы простыми словами"
-              disabled={isAddPending}
+              disabled={isAddPending || isAiPending}
             />
-            <button className="add-feature-button" type="submit" disabled={isAddPending}>
-              {isAddPending ? "Сохраняем..." : "Добавить функциональность"}
-            </button>
+            <div className="feature-form-actions">
+              <button
+                className="ai-button"
+                type="button"
+                onClick={handlePolishFeatureText}
+                disabled={isAddPending || isAiPending}
+              >
+                {isAiPending ? "ИИ редактирует..." : "Улучшить с ИИ"}
+              </button>
+              <button
+                className="add-feature-button"
+                type="submit"
+                disabled={isAddPending || isAiPending}
+              >
+                {isAddPending ? "Сохраняем..." : "Добавить функциональность"}
+              </button>
+            </div>
           </form>
           {addMessage && <p className="add-message">{addMessage}</p>}
           {isArticlesLoading && <p className="add-message">Загружаем статьи из базы...</p>}
@@ -748,13 +803,25 @@ function App() {
         </div>
 
         <section className="process-tree">
-          <h2
-            className="process-tree-title"
-            onClick={() => setIsDiagramView((prev) => !prev)}
-            title="Нажмите, чтобы переключить формат"
-          >
-            Дерево процессов {isDiagramView ? "(диаграмма)" : "(список)"}
-          </h2>
+          <div className="process-tree-header">
+            <h2>Дерево процессов</h2>
+            <div className="view-toggle" aria-label="Формат дерева процессов">
+              <button
+                type="button"
+                className={!isDiagramView ? "view-toggle-btn view-toggle-btn--active" : "view-toggle-btn"}
+                onClick={() => setIsDiagramView(false)}
+              >
+                Список
+              </button>
+              <button
+                type="button"
+                className={isDiagramView ? "view-toggle-btn view-toggle-btn--active" : "view-toggle-btn"}
+                onClick={() => setIsDiagramView(true)}
+              >
+                Диаграмма
+              </button>
+            </div>
+          </div>
           {!isDiagramView ? (
             <ul className="process-list">
               {processTree.map((node) => (
@@ -774,32 +841,27 @@ function App() {
               ))}
             </ul>
           ) : (
-            <div className="process-diagram tree-diagram">
-              <ul>
-                <li>
-                  <span className="diagram-root">KONCRIT WMS</span>
-                  <ul>
-                    {processTree.map((node) => (
-                      <li key={`diagram-${node.group}`}>
-                        <span className="diagram-node">{node.group}</span>
-                        <ul>
-                          {node.children.length > 0 ? (
-                            node.children.map((child) => (
-                              <li key={`diagram-child-${node.group}-${child}`}>
-                                <span className="diagram-leaf">{child}</span>
-                              </li>
-                            ))
-                          ) : (
-                            <li>
-                              <span className="diagram-leaf">Подразделы пока не добавлены</span>
-                            </li>
-                          )}
-                        </ul>
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              </ul>
+            <div className="process-diagram-map">
+              <div className="diagram-root">KONCRIT WMS</div>
+              <div className="diagram-lanes">
+                {processTree.map((node) => (
+                  <section key={`diagram-${node.group}`} className="diagram-lane">
+                    <div className="diagram-lane-heading">
+                      <h3>{node.group}</h3>
+                      <span>{node.children.length}</span>
+                    </div>
+                    <ul>
+                      {node.children.length > 0 ? (
+                        node.children.map((child) => (
+                          <li key={`diagram-child-${node.group}-${child}`}>{child}</li>
+                        ))
+                      ) : (
+                        <li>Подразделы пока не добавлены</li>
+                      )}
+                    </ul>
+                  </section>
+                ))}
+              </div>
             </div>
           )}
         </section>

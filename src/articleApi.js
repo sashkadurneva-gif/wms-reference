@@ -55,3 +55,9 @@ export const saveCustomArticles = (articles) =>
     method: "PUT",
     body: JSON.stringify(articles)
   });
+
+export const polishArticleText = ({ text, section }) =>
+  requestJson("/api/polish-article", {
+    method: "POST",
+    body: JSON.stringify({ text, section })
+  });
